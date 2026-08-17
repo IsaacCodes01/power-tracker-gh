@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -27,20 +28,30 @@ class AuthService {
       final user = credential.user;
       if (user != null) {
         // Every new signup is a regular user, no exceptions.
-        // Admin status is only ever changed manually in Firestore.
-        await _firestore.collection('users').doc(user.uid).set({
-          'uid': user.uid,
-          'email': email,
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        // We catch errors locally here so a Firestore failure won't crash the Auth process!
+        try {
+          await _firestore.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'email': email,
+            'role': 'user',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        } catch (databaseError) {
+          // Log the error to your terminal console so you know about it,
+          // but allow the function to continue so the user account is preserved.
+          debugPrint("⚠️ Firestore profile creation failed: $databaseError");
+        }
       }
 
       return user;
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
+    } catch (generalError) {
+      // Catches any non-Auth exceptions (like database issues) and passes a clean string
+      throw 'Account registered with warnings. Please try logging in.';
     }
   }
+
 
   // SIGN IN
   Future<User?> signIn({

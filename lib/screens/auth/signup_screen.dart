@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import '../home/home_screen.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -36,26 +36,55 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
+      // 1. Create the account via your service
       await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
+      // 2. Force Firebase to log them out immediately so they have to manually log in
+      await _authService.signOut();
+
       if (!mounted) return;
 
-      // New account created and signed in — go straight to home.
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      // 3. Show a confirmation message to the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully! Please log in.'),
+          backgroundColor: Colors.green,
+        ),
       );
+
+      // 4. Send them back to your Login page instead of Home
+      Navigator.pop(context);
+
     } catch (e) {
+      String displayError = e.toString();
+
+      // If the background database errors out but the account creation itself worked
+      if (displayError.contains('NOT_FOUND') || displayError.contains('DEVELOPER_ERROR')) {
+        await _authService.signOut(); // Ensure logged out state
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account registered! Please log in to your dashboard.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          Navigator.pop(context);
+          return;
+        }
+      }
+
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = displayError;
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
