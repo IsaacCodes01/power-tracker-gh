@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "568000509385",
+    "project_id": "power-tracker-gh",
+    "storage_bucket": "power-tracker-gh.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568000509385:android:9276b46d76c7dc2adc6418",
+        "android_client_info": {
+          "package_name": "com.example.power_tracker_gh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568000509385:android:439d4d2a425324b1dc6418",
+        "android_client_info": {
+          "package_name": "com.isaacotabil.power_tracker_gh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568000509385:android:77929f138c94e130dc6418",
+        "android_client_info": {
+          "package_name": "com.isaacotabil.powertrackergh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
