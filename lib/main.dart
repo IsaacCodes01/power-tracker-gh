@@ -7,8 +7,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp( options: DefaultFirebaseOptions.currentPlatform, );
 
-  // Quick verification test
-  print("🔥 Firebase initialized successfully!");
 
   runApp(const MyApp()); }
 
