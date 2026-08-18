@@ -3,6 +3,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../auth/login_screen.dart';
+import '../outage/report_outage_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -116,18 +117,23 @@ class HomeScreen extends StatelessWidget {
                         onPressed: () {
                           // Will open report_outage_screen.dart once built.
                         },
-                        icon: const Icon(Icons.report),
-                        label: const Text('Report Outage'),
+                        icon: const Icon(Icons.map),
+                        label: const Text('View Map'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          // Will open outage_map_screen.dart once built.
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ReportOutageScreen(),
+                            ),
+                          );
                         },
-                        icon: const Icon(Icons.map),
-                        label: const Text('View Map'),
+                        icon: const Icon(Icons.report),
+                        label: const Text('Report Outage'),
                       ),
                     ),
                   ],
@@ -178,7 +184,10 @@ class HomeScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // We'll wire this to the report screen shortly.
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ReportOutageScreen()),
+          );
         },
         child: const Icon(Icons.add),
       ),
