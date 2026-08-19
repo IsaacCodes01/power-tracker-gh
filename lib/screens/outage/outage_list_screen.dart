@@ -4,7 +4,7 @@ import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
 import 'outage_detail_screen.dart';
 
-enum ReportFilter { all, mine, restored, pending }
+enum ReportFilter { all, mine, restored, noLight, confirmed, yourLocation }
 
 class OutageListScreen extends StatefulWidget {
   const OutageListScreen({super.key});
@@ -74,10 +74,18 @@ class _OutageListScreenState extends State<OutageListScreen> {
             .where((r) => r.status == OutageStatus.restored)
             .toList();
         break;
-      case ReportFilter.pending:
+      case ReportFilter.noLight:
         result = result
             .where((r) => r.status != OutageStatus.restored)
             .toList();
+        break;
+      case ReportFilter.confirmed:
+        result = result.where((r) => r.confirmedByUserIds.isNotEmpty).toList();
+        break;
+      case ReportFilter.yourLocation:
+        // Placeholder for now — needs the user's saved area, which we
+        // haven't built a way to set yet (that's a future step).
+        result = [];
         break;
       case ReportFilter.all:
         break;
@@ -154,9 +162,16 @@ class _OutageListScreenState extends State<OutageListScreen> {
                       const SizedBox(width: 8),
                       _buildFilterChip('Your Reports', ReportFilter.mine),
                       const SizedBox(width: 8),
+                      _buildFilterChip('No Light', ReportFilter.noLight),
+                      const SizedBox(width: 8),
                       _buildFilterChip('Restored', ReportFilter.restored),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Pending', ReportFilter.pending),
+                      _buildFilterChip('Confirmed', ReportFilter.confirmed),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Your Location',
+                        ReportFilter.yourLocation,
+                      ),
                     ],
                   ),
                 ),
@@ -275,14 +290,38 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
   Widget _buildFilterChip(String label, ReportFilter filter) {
     final isSelected = _selectedFilter == filter;
+    final isComingSoon = filter == ReportFilter.yourLocation;
+
     return ChoiceChip(
-      label: Text(label),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (isComingSoon) ...[
+            const SizedBox(width: 4),
+            const Icon(Icons.lock_clock, size: 14),
+          ],
+        ],
+      ),
       selected: isSelected,
-      onSelected: (_) => setState(() => _selectedFilter = filter),
+      onSelected: (_) {
+        if (isComingSoon) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Location filtering is coming soon!'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          return;
+        }
+        setState(() => _selectedFilter = filter);
+      },
       selectedColor: Colors.deepPurple[100],
-      backgroundColor: Colors.white,
+      backgroundColor: isComingSoon ? Colors.grey[200] : Colors.white,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.deepPurple : Colors.black87,
+        color: isComingSoon
+            ? Colors.grey
+            : (isSelected ? Colors.deepPurple : Colors.black87),
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
