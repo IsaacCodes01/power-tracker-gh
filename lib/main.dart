@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Power Tracker',
+      title: 'Power Tracker GH',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         // FIXED: Added 'ColorScheme' back right before '.fromSeed'

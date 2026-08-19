@@ -13,24 +13,32 @@ class HomeScreen extends StatelessWidget {
       case OutageStatus.restored:
         return Colors.green;
       case OutageStatus.reported:
-        return Colors.red;
+        return Colors.redAccent;
       case OutageStatus.investigating:
-      case OutageStatus.repairing:
         return Colors.orange;
+      case OutageStatus.repairing:
+        return Colors.blue;
     }
   }
 
   String _statusLabel(OutageStatus status) {
     switch (status) {
       case OutageStatus.restored:
-        return 'Power Available';
+        return 'Resolved';
       case OutageStatus.reported:
-        return 'Outage Reported';
+        return 'Reported';
       case OutageStatus.investigating:
-        return 'Under Investigation';
+        return 'Investigating';
       case OutageStatus.repairing:
-        return 'Repair in Progress';
+        return 'Fixing';
     }
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
   }
 
   @override
@@ -39,8 +47,12 @@ class HomeScreen extends StatelessWidget {
     final firestoreService = FirestoreService();
 
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Power Tracker GH'),
+        backgroundColor: Colors.grey[100],
+        elevation: 0,
+        foregroundColor: Colors.black87,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -68,128 +80,240 @@ class HomeScreen extends StatelessWidget {
           }
 
           final reports = snapshot.data ?? [];
-          // Most recent report overall, used to color the summary strip.
-          final latestReport = reports.isNotEmpty ? reports.first : null;
 
-          return Column(
-            children: [
-              // STATUS SUMMARY STRIP
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                color: latestReport != null
-                    ? _statusColor(latestReport.status)
-                    : Colors.grey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      latestReport != null
-                          ? _statusLabel(latestReport.status)
-                          : 'No Reports Yet',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (latestReport != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        latestReport.area,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ],
+          // Real counts instead of hardcoded numbers.
+          final activeCount = reports
+              .where((r) => r.status != OutageStatus.restored)
+              .length;
+          final resolvedTodayCount = reports.where((r) {
+            if (r.status != OutageStatus.restored) return false;
+            final now = DateTime.now();
+            return r.createdAt.year == now.year &&
+                r.createdAt.month == now.month &&
+                r.createdAt.day == now.day;
+          }).length;
+
+          // Only the 3 most recent reports, since Home is a quick glance.
+          final recentReports = reports.take(3).toList();
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Welcome Back 👋',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Power Overview',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 20),
 
-              // QUICK ACTION BUTTONS
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
+                Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Will open report_outage_screen.dart once built.
-                        },
-                        icon: const Icon(Icons.map),
-                        label: const Text('View Map'),
+                      child: _buildStatusCard(
+                        title: 'Active Outages',
+                        value: '$activeCount',
+                        icon: Icons.flash_off,
+                        color: Colors.redAccent,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ReportOutageScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.report),
-                        label: const Text('Report Outage'),
+                      child: _buildStatusCard(
+                        title: 'Resolved Today',
+                        value: '$resolvedTodayCount',
+                        icon: Icons.bolt,
+                        color: Colors.green,
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 24),
 
-              // COMMUNITY FEED (unchanged from before, just moved into Column)
-              Expanded(
-                child: reports.isEmpty
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'No outages reported yet.\nTap the + button to report one.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: reports.length,
-                        itemBuilder: (context, index) {
-                          final report = reports[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: _statusColor(report.status),
-                              ),
-                              title: Text(report.area),
-                              subtitle: Text(
-                                '${report.status.name} • ${report.severity.name}\n'
-                                '${report.description}',
-                              ),
-                              isThreeLine: true,
-                              trailing: Text(
-                                '${report.confirmedByUserIds.length} 👥',
-                              ),
-                            ),
-                          );
-                        },
+                const Text(
+                  'Quick Actions',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.deepPurple[50],
+                      child: const Icon(
+                        Icons.add_alert,
+                        color: Colors.deepPurple,
                       ),
-              ),
-            ],
+                    ),
+                    title: const Text(
+                      'File a New Report',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Report a sudden blackout or transformer issue instantly',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ReportOutageScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Recent Reported Outages',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                if (recentReports.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No outages reported yet.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                else
+                  ...recentReports.map(
+                    (report) => _buildOutageLogItem(
+                      location: report.area,
+                      time: _timeAgo(report.createdAt),
+                      status: _statusLabel(report.status),
+                      statusColor: _statusColor(report.status),
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ReportOutageScreen()),
-          );
-        },
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildStatusCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withAlpha(20),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 30),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutageLogItem({
+    required String location,
+    required String time,
+    required String status,
+    required Color statusColor,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Row(
+          children: [
+            Icon(Icons.location_on, color: Colors.grey[400], size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    location,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: statusColor.withAlpha(25),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

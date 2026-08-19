@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:power_tracker_gh/screens/outage/outage_list_screen.dart';
 import 'home/home_screen.dart';
 import 'map/outage_map_screen.dart';
 import 'outage/report_outage_screen.dart';
@@ -17,6 +18,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const HomeScreen(),
     const OutageMapScreen(),
     const ReportOutageScreen(),
+    const OutageListScreen(),
   ];
 
   @override
@@ -42,6 +44,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle),
             label: 'Add Report',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.flash_off),
+            label: 'Outages',
           ),
         ],
       ),
