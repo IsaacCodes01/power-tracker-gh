@@ -29,8 +29,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           setState(() => _currentIndex = index);
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
+        // FIXED: Change these colors so they pop contrastingly against the white bar
+        backgroundColor: Colors.white,
+        // Forces the bottom bar background to stay solid
+        selectedItemColor: Colors.deepPurple,
+        // Force selected icon to match your deep purple theme
+        unselectedItemColor: Colors.grey[600],
+        // Darken the unselected grey so it stands out cleanly
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),

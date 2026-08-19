@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'POWER TRACKER',
+              'POWER TRACKER GH',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 24,
