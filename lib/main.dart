@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/main_navigation_screen.dart'; // Make sure this path matches your folder structure
-import 'services/auth_service.dart'; // Make sure this path matches your folder structure
+import 'screens/main_navigation_screen.dart';
+import 'services/auth_service.dart';
+import 'screens/splash_screens.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // CHANGED: Instead of loading LoginScreen directly, we load the gatekeeper
-      home: const AppGatekeeper(),
+      home: const SplashScreen(),
     );
   }
 }
