@@ -208,7 +208,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
                 // FILTERED LIST
                 Text(
-                  'Reports (${filteredReports.length})',
+                  'Recent Reports (${filteredReports.length})',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
+import '../../services/location_service.dart';
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -17,6 +18,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  final _locationService = LocationService();
 
   OutageSeverity _selectedSeverity = OutageSeverity.minor;
   bool _isSubmitting = false;
@@ -34,15 +36,21 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
     setState(() => _isSubmitting = true);
 
     final currentUser = _authService.currentUser;
+    final areaText = _areaController.text.trim();
+
+    // Look up real coordinates for the typed area before saving.
+    final coordinates = await _locationService.getCoordinatesFromArea(areaText);
 
     final newReport = OutageReport(
       id: '',
       // Firestore assigns this automatically, so left blank here.
       reporterId: currentUser?.uid ?? '',
-      area: _areaController.text.trim(),
-      latitude: 0.0,
-      // Placeholder until the map/location picker is built.
-      longitude: 0.0,
+      area: areaText,
+      latitude: coordinates?['latitude'] ?? 0.0,
+      longitude: coordinates?['longitude'] ?? 0.0,
+      // If the lookup succeeded, use real coordinates. If it failed
+      // (no internet, area not found), fall back to 0,0 rather than
+      // blocking the whole report from being submitted.
       startTime: DateTime.now(),
       status: OutageStatus.reported,
       severity: _selectedSeverity,
