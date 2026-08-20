@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../main.dart';
 
-// CHANGED: Removed "Striking" from the name
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -11,18 +10,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AppGatekeeper()),
-        );
-      }
-    });
-  }
+  // FIXED: The old Future.delayed timer has been completely deleted from here!
+  // This prevents the countdown from starting on a blank screen.
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +25,19 @@ class _SplashScreenState extends State<SplashScreen> {
               'assets/animations/bolt_animation.json',
               width: 250,
               repeat: false,
+              // FIXED: The timer now starts ONLY after the phone successfully finishes decoding
+              // and loading the lightning bolt asset in short-term memory!
+              onLoaded: (composition) {
+                Future.delayed(composition.duration, () {
+                  if (!context.mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AppGatekeeper(),
+                    ),
+                  );
+                });
+              },
             ),
             const SizedBox(height: 20),
             const Text(

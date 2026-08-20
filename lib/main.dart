@@ -24,11 +24,9 @@ class MyApp extends StatelessWidget {
       title: 'Power Tracker GH',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // FIXED: Added 'ColorScheme' back right before '.fromSeed'
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      // CHANGED: Instead of loading LoginScreen directly, we load the gatekeeper
       home: const SplashScreen(),
     );
   }
@@ -45,8 +43,11 @@ class AppGatekeeper extends StatelessWidget {
     return StreamBuilder(
       stream: authService.authStateChanges,
       builder: (context, snapshot) {
-        // While checking Firebase connection, show a clean loading spinner
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        // FIXED: Added an explicit none/waiting state check.
+        // This holds the framework back until the background stream is active,
+        // preventing the nav icons from failing to draw on the initial run.
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            snapshot.connectionState == ConnectionState.none) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
