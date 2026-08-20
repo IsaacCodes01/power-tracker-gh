@@ -3,6 +3,9 @@ import 'package:power_tracker_gh/screens/outage/outage_list_screen.dart';
 import 'home/home_screen.dart';
 import 'map/outage_map_screen.dart';
 import 'outage/report_outage_screen.dart';
+import 'admin/admin_dashboard_screen.dart';
+import '../services/auth_service.dart';
+import 'settings/settings_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -13,43 +16,85 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  final _authService = AuthService();
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const OutageMapScreen(),
-    const ReportOutageScreen(),
-    const OutageListScreen(),
-  ];
+  bool _isAdmin = false;
+  bool _isLoadingRole = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      final role = await _authService.getUserRole(uid);
+      setState(() {
+        _isAdmin = role == 'admin';
+        _isLoadingRole = false;
+      });
+    } else {
+      setState(() => _isLoadingRole = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingRole) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // The screen list and nav items are built dynamically — the Admin
+    // tab only gets added to either list at all if the account is admin.
+    final screens = [
+      const HomeScreen(),
+      const OutageMapScreen(),
+      const ReportOutageScreen(),
+      const OutageListScreen(),
+      const SettingsScreen(),
+      if (_isAdmin) const AdminDashboardScreen(),
+    ];
+
+    final navItems = [
+      const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+      const BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.add_circle),
+        label: 'Add Report',
+      ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.flash_off),
+        label: 'Outages',
+      ),
+      if (_isAdmin)
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.admin_panel_settings),
+          label: 'Admin',
+        ),
+      const BottomNavigationBarItem(
+        icon: Icon(Icons.settings),
+        label: 'Settings',
+      ),
+    ];
+
+    // Keeps the index safely in range if role finishes loading
+    // after a tap already happened.
+    final safeIndex = _currentIndex < screens.length ? _currentIndex : 0;
+
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: screens[safeIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+        currentIndex: safeIndex,
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
         type: BottomNavigationBarType.fixed,
-        // FIXED: Change these colors so they pop contrastingly against the white bar
         backgroundColor: Colors.white,
-        // Forces the bottom bar background to stay solid
         selectedItemColor: Colors.deepPurple,
-        // Force selected icon to match your deep purple theme
         unselectedItemColor: Colors.grey[600],
-        // Darken the unselected grey so it stands out cleanly
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle),
-            label: 'Add Report',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.flash_off),
-            label: 'Outages',
-          ),
-        ],
+        items: navItems,
       ),
     );
   }

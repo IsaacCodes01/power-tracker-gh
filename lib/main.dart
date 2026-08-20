@@ -54,7 +54,7 @@ class AppGatekeeper extends StatelessWidget {
         }
 
         // If a user session is active, go straight to navigation tabs
-        if (snapshot.hasData) {
+        if (snapshot.hasData && snapshot.data != null) {
           return const MainNavigationScreen();
         }
 

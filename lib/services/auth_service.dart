@@ -52,7 +52,6 @@ class AuthService {
     }
   }
 
-
   // SIGN IN
   Future<User?> signIn({
     required String email,
@@ -91,6 +90,46 @@ class AuthService {
       return doc.data()!['role'] ?? 'user';
     }
     return 'user';
+  }
+
+  // Add these two methods inside your AuthService class
+
+  Future<void> updateEmail(String newEmail) async {
+    try {
+      await _auth.currentUser?.verifyBeforeUpdateEmail(newEmail);
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        await _firestore.collection('users').doc(uid).delete();
+      }
+      await _auth.currentUser?.delete();
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
+  }
+
+  Future<void> reauthenticate(String password) async {
+    final user = _auth.currentUser;
+    final email = user?.email;
+    if (user == null || email == null) {
+      throw 'No user currently signed in.';
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
   }
 
   // Converts Firebase's technical error codes into messages a user
