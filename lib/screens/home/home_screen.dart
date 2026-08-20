@@ -3,12 +3,17 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../auth/login_screen.dart';
-import '../outage/report_outage_screen.dart';
-import '../outage/outage_list_screen.dart';
 import '../outage/outage_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final VoidCallback onNavigateToReport;
+  final VoidCallback onNavigateToOutages;
+
+  const HomeScreen({
+    super.key,
+    required this.onNavigateToReport,
+    required this.onNavigateToOutages,
+  });
 
   Color _statusColor(OutageStatus status) {
     switch (status) {
@@ -175,14 +180,7 @@ class HomeScreen extends StatelessWidget {
                       'Report a sudden blackout or transformer issue instantly',
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ReportOutageScreen(),
-                        ),
-                      );
-                    },
+                    onTap: onNavigateToReport,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -200,14 +198,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const OutageListScreen(),
-                          ),
-                        );
-                      },
+                      onTap: onNavigateToOutages,
                       child: const Text(
                         'See All',
                         style: TextStyle(

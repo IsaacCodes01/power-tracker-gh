@@ -49,7 +49,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // The screen list and nav items are built dynamically — the Admin
     // tab only gets added to either list at all if the account is admin.
     final screens = [
-      const HomeScreen(),
+      HomeScreen(
+        onNavigateToReport: () => setState(() => _currentIndex = 2),
+        onNavigateToOutages: () => setState(() => _currentIndex = 3),
+      ),
       const OutageMapScreen(),
       const ReportOutageScreen(),
       const OutageListScreen(),

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:power_tracker_gh/screens/main_navigation_screen.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
-import '../home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // can't hit "back" and land on login again.
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
       );
     } catch (e) {
       setState(() {
@@ -151,10 +151,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _isLoading ? null : _handleLogin,
                     child: _isLoading
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text('Log In'),
                   ),
                 ),
