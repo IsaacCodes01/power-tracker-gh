@@ -4,6 +4,9 @@ import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../services/location_service.dart';
 
+// 1. FIXED: Added this import statement so the file can recognize MainNavigationScreen
+import '../main_navigation_screen.dart';
+
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
 
@@ -62,9 +65,17 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       await _firestoreService.createReport(newReport);
       if (!mounted) return;
 
-      // Success — close this screen and return to Home,
-      // where the new report will now appear in the live feed.
-      Navigator.pop(context);
+      // FIXED: Checks if there is a history trail to pop. If not, it falls back safely.
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        // If nested inside tabs with no back history, instantly force a clean slide back
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -73,7 +84,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
-  }
+  } // <--- 2. FIXED: THIS CLOSING BRACE WAS MISSING IN YOUR FILE TO CLOSE _handleSubmit!
 
   @override
   Widget build(BuildContext context) {

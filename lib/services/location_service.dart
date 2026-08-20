@@ -17,12 +17,12 @@ class LocationService {
 
       if (response.statusCode == 200 && response.body.isNotEmpty) {
         final results = jsonDecode(response.body);
-        
+
         if (results is List && results.isNotEmpty) {
-          final first = results[0];
+          final Map<String, dynamic> firstRecord = results[0];
           return {
-            'latitude': double.parse(first['lat'] ?? '0.0'),
-            'longitude': double.parse(first['lon'] ?? '0.0'),
+            'latitude': double.parse(firstRecord['lat'] ?? '0.0'),
+            'longitude': double.parse(firstRecord['lon'] ?? '0.0'),
           };
         }
       }
