@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -18,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -77,16 +79,53 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
+                  inputFormatters: [
+                    // Blocks the Space bar completely inside the email input field
+                    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  ],
+                  onChanged: (value) {
+                    if (value.contains(' ')) {
+                      final cleanText = value.replaceAll(' ', '');
+                      _emailController.value = _emailController.value.copyWith(
+                        text: cleanText,
+                        selection: TextSelection.collapsed(
+                          offset: cleanText.length,
+                        ),
+                      );
+                    }
+                  },
+                  autofillHints: const [AutofillHints.email],
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(
                     labelText: 'Email',
+                    prefixIcon: Icon(Icons.email_outlined),
                     border: OutlineInputBorder(),
+                    // 2. ERROR STYLING: Customize the error text font size, color, and weight
+                    errorStyle: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    // 2. ERROR STYLING: Make the border thicker/bolder when invalid
+                    errorBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Colors.redAccent,
+                        width: 2.0,
+                      ),
+                    ),
+                    focusedErrorBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red, width: 2.5),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
-                    if (!value.contains('@')) {
-                      return 'Please enter a valid email';
+                    final emailRegex = RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    );
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return 'Please enter a valid email address';
                     }
                     return null;
                   },
@@ -96,10 +135,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Password field
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    border: OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                    border: const OutlineInputBorder(),
+                    // UNIFORM ERROR STYLING ADDED HERE:
+                    errorStyle: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    errorBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: Colors.redAccent,
+                        width: 2.0,
+                      ),
+                    ),
+                    focusedErrorBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red, width: 2.5),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
