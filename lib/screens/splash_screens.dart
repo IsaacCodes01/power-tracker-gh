@@ -25,8 +25,20 @@ class _SplashScreenState extends State<SplashScreen> {
               'assets/animations/bolt_animation.json',
               width: 250,
               repeat: false,
-              // FIXED: The timer now starts ONLY after the phone successfully finishes decoding
-              // and loading the lightning bolt asset in short-term memory!
+              errorBuilder: (context, error, stackTrace) {
+                // If the animation fails to load for any reason, don't leave the
+                // user stuck — move on immediately instead of freezing forever.
+                Future.microtask(() {
+                  if (!context.mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AppGatekeeper(),
+                    ),
+                  );
+                });
+                return const SizedBox(width: 250, height: 250);
+              },
               onLoaded: (composition) {
                 Future.delayed(composition.duration, () {
                   if (!context.mounted) return;

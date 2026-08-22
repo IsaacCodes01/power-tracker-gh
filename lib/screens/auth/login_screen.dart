@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:power_tracker_gh/screens/main_navigation_screen.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -41,15 +40,8 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
-      if (!mounted) return;
-
-      // Success — replace the login screen with home so the user
-      // can't hit "back" and land on login again.
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-      );
+      // That's it — AppGatekeeper's authStateChanges stream will
+      // automatically detect the successful login and swap screens.
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
