@@ -7,12 +7,16 @@ class AppUser {
   final List<String> savedAreas;
   final DateTime createdAt;
 
+  // ADDED: The new optional phoneNumber property
+  final String phoneNumber;
+
   AppUser({
     required this.uid,
     required this.email,
     required this.role,
     this.savedAreas = const [],
     required this.createdAt,
+    this.phoneNumber = '', // Default to an empty string if not provided
   });
 
   // Converts a Firestore document into an AppUser object.
@@ -25,6 +29,8 @@ class AppUser {
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
+      // FIXED: Safely reads the phoneNumber from the Firestore document payload
+      phoneNumber: data['phoneNumber'] ?? '',
     );
   }
 
@@ -36,6 +42,8 @@ class AppUser {
       'role': role,
       'savedAreas': savedAreas,
       'createdAt': Timestamp.fromDate(createdAt),
+      // FIXED: Packs the phone number string into your database upload map
+      'phoneNumber': phoneNumber,
     };
   }
 

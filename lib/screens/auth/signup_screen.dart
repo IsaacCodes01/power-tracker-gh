@@ -78,45 +78,53 @@ class _SignupScreenState extends State<SignupScreen> {
       _errorMessage = null;
     });
 
+    // 1. FIXED: Pre-capture your UI states before the async operations run!
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     try {
+      // 2. FIXED: Pull the full formatted value out of your country flag selection model
+      // (e.g. If Ghana flag is picked and they type 241234567, this evaluates to "+233241234567")
+      final fullPhoneNumber = number.phoneNumber?.trim() ?? '';
+
       await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        // Note: If your AuthService.signUp supports phone numbers,
-        // you would pass _phoneController.text.trim() here too.
+        // 3. FIXED: Passes your clean data payload directly down to your updated service!
+        phoneNumber: fullPhoneNumber.isNotEmpty ? fullPhoneNumber : '',
       );
 
       await _authService.signOut();
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
+      // 4. FIXED: Safe execution trail using your clean pre-loaded instances!
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Account created successfully! Please log in.'),
           backgroundColor: Colors.green,
         ),
       );
 
-      Navigator.pop(context);
+      navigator.pop();
     } catch (e) {
       String displayError = e.toString();
       if (displayError.contains('NOT_FOUND') ||
           displayError.contains('DEVELOPER_ERROR')) {
         await _authService.signOut();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Account registered! Please log in to your dashboard.',
-              ),
-              backgroundColor: Colors.orange,
+
+        // 5. FIXED: Safe custom developer error display handlers
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Account registered! Please log in to your dashboard.',
             ),
-          );
-          Navigator.pop(context);
-          return;
-        }
+            backgroundColor: Colors.orange,
+          ),
+        );
+        navigator.pop();
+        return;
       }
-      setState(() => _errorMessage = displayError);
+
+      if (mounted) setState(() => _errorMessage = displayError);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

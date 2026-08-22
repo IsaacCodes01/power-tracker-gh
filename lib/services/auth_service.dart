@@ -15,9 +15,11 @@ class AuthService {
 
   // SIGN UP: creates the account in Firebase Auth, then creates a matching
   // user profile document in Firestore with role hardcoded to "user".
+  // UPDATED: Added the optional phoneNumber argument here.
   Future<User?> signUp({
     required String email,
     required String password,
+    String? phoneNumber,
   }) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
@@ -35,6 +37,8 @@ class AuthService {
             'email': email,
             'role': 'user',
             'createdAt': FieldValue.serverTimestamp(),
+            // FIXED: Safely logs the phone number field or defaults to an empty string
+            'phoneNumber': phoneNumber ?? '',
           });
         } catch (databaseError) {
           // Log the error to your terminal console so you know about it,
@@ -91,8 +95,6 @@ class AuthService {
     }
     return 'user';
   }
-
-  // Add these two methods inside your AuthService class
 
   Future<void> updateEmail(String newEmail) async {
     try {
