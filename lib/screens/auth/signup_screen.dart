@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Required for inputFormatters
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
-
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -12,19 +13,61 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController(); // Added phone controller
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
 
+  // For the country picker
+  PhoneNumber number = PhoneNumber(isoCode: 'GH'); // Default to Ghana
+
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Visibility states for password toggles
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _phoneController.dispose(); // Dispose phone controller
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // Reusable helper to keep the UI code clean and consistent with Login Screen
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData prefixIcon,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggle,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(prefixIcon),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+              onPressed: onToggle,
+            )
+          : null,
+      border: const OutlineInputBorder(),
+      // Custom Error Styling from Login Screen
+      errorStyle: const TextStyle(
+        color: Colors.redAccent,
+        fontSize: 13.0,
+        fontWeight: FontWeight.bold,
+      ),
+      errorBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.redAccent, width: 2.0),
+      ),
+      focusedErrorBorder: const OutlineInputBorder(
+        borderSide: BorderSide(color: Colors.red, width: 2.5),
+      ),
+    );
   }
 
   Future<void> _handleSignup() async {
@@ -36,18 +79,17 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      // 1. Create the account via your service
       await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        // Note: If your AuthService.signUp supports phone numbers,
+        // you would pass _phoneController.text.trim() here too.
       );
 
-      // 2. Force Firebase to log them out immediately so they have to manually log in
       await _authService.signOut();
 
       if (!mounted) return;
 
-      // 3. Show a confirmation message to the user
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Account created successfully! Please log in.'),
@@ -55,20 +97,18 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       );
 
-      // 4. Send them back to your Login page instead of Home
       Navigator.pop(context);
-
     } catch (e) {
       String displayError = e.toString();
-
-      // If the background database errors out but the account creation itself worked
-      if (displayError.contains('NOT_FOUND') || displayError.contains('DEVELOPER_ERROR')) {
-        await _authService.signOut(); // Ensure logged out state
-
+      if (displayError.contains('NOT_FOUND') ||
+          displayError.contains('DEVELOPER_ERROR')) {
+        await _authService.signOut();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account registered! Please log in to your dashboard.'),
+              content: Text(
+                'Account registered! Please log in to your dashboard.',
+              ),
               backgroundColor: Colors.orange,
             ),
           );
@@ -76,15 +116,11 @@ class _SignupScreenState extends State<SignupScreen> {
           return;
         }
       }
-
-      setState(() {
-        _errorMessage = displayError;
-      });
+      setState(() => _errorMessage = displayError);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -109,17 +145,23 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 32),
 
+                // 1. EMAIL FIELD
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                  ],
+                  decoration: _buildInputDecoration(
+                    label: 'Email',
+                    prefixIcon: Icons.email_outlined,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please enter your email';
                     }
+
                     if (!value.contains('@')) {
                       return 'Please enter a valid email';
                     }
@@ -128,31 +170,79 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // PHONE WITH COUNTRY DROPDOWN
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  // Fixed syntax
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey), // Fixed syntax
+                    borderRadius: BorderRadius.circular(8), // Fixed syntax
+                  ),
+                  child: InternationalPhoneNumberInput(
+                    onInputChanged: (PhoneNumber value) {
+                      number = value;
+                    },
+                    textFieldController: _phoneController,
+                    initialValue: number,
+                    selectorConfig: const SelectorConfig(
+                      selectorType: PhoneInputSelectorType.DROPDOWN,
+                      // Fixed syntax
+                      setSelectorButtonAsPrefixIcon: true,
+                      leadingPadding: 16.0, // Added necessary value
+                    ),
+                    ignoreBlank: true,
+                    // Makes it optional
+                    autoValidateMode: AutovalidateMode.onUserInteraction,
+                    // Fixed syntax
+                    inputDecoration: const InputDecoration(
+                      labelText: 'Phone Number (Optional)',
+                      border: InputBorder
+                          .none, // Hide inner border since Container has one
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 3. PASSWORD FIELD
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.next,
+                  decoration: _buildInputDecoration(
+                    label: 'Password',
+                    prefixIcon: Icons.lock_outline,
+                    isPassword: true,
+                    obscureText: _obscurePassword,
+                    onToggle: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a password';
                     }
+
                     if (value.length < 6) {
                       return 'Password must be at least 6 characters';
                     }
+
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
 
+                // 4. CONFIRM PASSWORD FIELD
                 TextFormField(
                   controller: _confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm Password',
-                    border: OutlineInputBorder(),
+                  obscureText: _obscureConfirmPassword,
+                  textInputAction: TextInputAction.done,
+                  decoration: _buildInputDecoration(
+                    label: 'Confirm Password',
+                    prefixIcon: Icons.lock_reset_outlined,
+                    isPassword: true,
+                    obscureText: _obscureConfirmPassword,
+                    onToggle: () => setState(
+                      () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                    ),
                   ),
                   validator: (value) {
                     if (value != _passwordController.text) {
@@ -178,10 +268,10 @@ class _SignupScreenState extends State<SignupScreen> {
                     onPressed: _isLoading ? null : _handleSignup,
                     child: _isLoading
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text('Create Account'),
                   ),
                 ),

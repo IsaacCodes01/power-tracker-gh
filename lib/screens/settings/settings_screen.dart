@@ -95,7 +95,7 @@ class SettingsScreen extends StatelessWidget {
                   context,
                   icon: Icons.person_outline,
                   title: 'Personal Information',
-                  subtitle: 'Update your email',
+                  subtitle: 'Update your email and phone number',
                   destination: const PersonalInformationScreen(),
                 ),
                 const Divider(height: 1),
