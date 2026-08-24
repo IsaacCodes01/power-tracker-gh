@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
-import 'outage_detail_screen.dart';
+import '../../widgets/outage_card.dart';
 
 enum ReportFilter { all, mine, restored, noLight, confirmed, yourLocation }
 
@@ -25,39 +25,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  Color _statusColor(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return Colors.green;
-      case OutageStatus.reported:
-        return Colors.redAccent;
-      case OutageStatus.investigating:
-        return Colors.orange;
-      case OutageStatus.repairing:
-        return Colors.blue;
-    }
-  }
-
-  String _statusLabel(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return 'Resolved';
-      case OutageStatus.reported:
-        return 'Reported';
-      case OutageStatus.investigating:
-        return 'Investigating';
-      case OutageStatus.repairing:
-        return 'Fixing';
-    }
-  }
-
-  String _timeAgo(DateTime dateTime) {
-    final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    return '${diff.inDays} days ago';
   }
 
   List<OutageReport> _applyFilters(List<OutageReport> reports) {
@@ -232,60 +199,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
                                 itemCount: filteredReports.length,
                                 itemBuilder: (context, index) {
                                   final report = filteredReports[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 10),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: ListTile(
-                                      leading: Icon(
-                                        Icons.location_on,
-                                        color: Colors.grey[400],
-                                      ),
-                                      title: Text(
-                                        report.area,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        _timeAgo(report.createdAt),
-                                      ),
-                                      trailing: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(
-                                            report.status,
-                                          ).withAlpha(25),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _statusLabel(report.status),
-                                          style: TextStyle(
-                                            color: _statusColor(report.status),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => OutageDetailScreen(
-                                              report: report,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  );
+                                  return OutageCard(report: report);
                                 },
                               ),
                       ),

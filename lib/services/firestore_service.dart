@@ -69,6 +69,22 @@ class FirestoreService {
     await _reportsRef.doc(reportId).update({'verified': true});
   }
 
+  // Looks up initials (first letter of email) for a list of user IDs,
+  // used to show small avatar bubbles on report cards.
+  Future<List<String>> getUserInitials(List<String> uids) async {
+    if (uids.isEmpty) return [];
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: uids.take(10).toList())
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final email = doc.data()['email'] as String? ?? '?';
+      return email.substring(0, 1).toUpperCase();
+    }).toList();
+  }
+
   // ==========================================
   //            USER PROFILE METHODS
   // ==========================================

@@ -23,6 +23,9 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
   final _firestoreService = FirestoreService();
   final _locationService = LocationService();
 
+  OutageType _selectedOutageType = OutageType.powerOutage;
+  TimeOfDay _selectedTime = TimeOfDay.now();
+
   OutageSeverity _selectedSeverity = OutageSeverity.minor;
   bool _isSubmitting = false;
 
@@ -49,14 +52,22 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       // Firestore assigns this automatically, so left blank here.
       reporterId: currentUser?.uid ?? '',
       area: areaText,
+      confirmedByUserIds: currentUser != null ? [currentUser.uid] : [],
       latitude: coordinates?['latitude'] ?? 0.0,
       longitude: coordinates?['longitude'] ?? 0.0,
       // If the lookup succeeded, use real coordinates. If it failed
       // (no internet, area not found), fall back to 0,0 rather than
       // blocking the whole report from being submitted.
-      startTime: DateTime.now(),
+      startTime: DateTime(
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
+        _selectedTime.hour,
+        _selectedTime.minute,
+      ),
       status: OutageStatus.reported,
       severity: _selectedSeverity,
+      outageType: _selectedOutageType,
       description: _descriptionController.text.trim(),
       createdAt: DateTime.now(),
     );
@@ -85,6 +96,16 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       if (mounted) setState(() => _isSubmitting = false);
     }
   } // <--- 2. FIXED: THIS CLOSING BRACE WAS MISSING IN YOUR FILE TO CLOSE _handleSubmit!
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (picked != null) {
+      setState(() => _selectedTime = picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +161,30 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 ),
                 const SizedBox(height: 20),
 
+                const SizedBox(height: 20),
+                const Text(
+                  'Outage Type',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<OutageType>(
+                  initialValue: _selectedOutageType,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                  items: OutageType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(outageTypeLabel(type)),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedOutageType = value);
+                    }
+                  },
+                ),
+
                 TextFormField(
                   controller: _descriptionController,
                   maxLines: 4,
@@ -157,6 +202,33 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                   },
                 ),
                 const SizedBox(height: 28),
+
+                const SizedBox(height: 20),
+                const Text(
+                  'Outage Time',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: _pickTime,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[400]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 18),
+                        const SizedBox(width: 10),
+                        Text(_selectedTime.format(context)),
+                      ],
+                    ),
+                  ),
+                ),
 
                 SizedBox(
                   height: 48,

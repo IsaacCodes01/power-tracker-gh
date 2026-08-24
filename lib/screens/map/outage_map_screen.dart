@@ -7,7 +7,10 @@ import '../../models/outage_report.dart';
 import '../outage/outage_detail_screen.dart';
 
 class OutageMapScreen extends StatefulWidget {
-  const OutageMapScreen({super.key});
+  final double? focusLatitude;
+  final double? focusLongitude;
+
+  const OutageMapScreen({super.key, this.focusLatitude, this.focusLongitude});
 
   @override
   State<OutageMapScreen> createState() => _OutageMapScreenState();
@@ -140,6 +143,14 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
     final firestoreService = FirestoreService();
     final defaultCenter = LatLng(5.6037, -0.1870);
 
+    // If this screen was opened with a specific report's coordinates
+    // (e.g. from "View on map"), center there. Otherwise use the
+    // first report's location, or fall back to Accra.
+    final initialCenter =
+        (widget.focusLatitude != null && widget.focusLongitude != null)
+        ? LatLng(widget.focusLatitude!, widget.focusLongitude!)
+        : null;
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: StreamBuilder<List<OutageReport>>(
@@ -162,13 +173,15 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
               FlutterMap(
                 mapController: _mapController,
                 options: MapOptions(
-                  initialCenter: mappableReports.isNotEmpty
-                      ? LatLng(
-                          mappableReports.first.latitude,
-                          mappableReports.first.longitude,
-                        )
-                      : defaultCenter,
-                  initialZoom: 12,
+                  initialCenter:
+                      initialCenter ??
+                      (mappableReports.isNotEmpty
+                          ? LatLng(
+                              mappableReports.first.latitude,
+                              mappableReports.first.longitude,
+                            )
+                          : defaultCenter),
+                  initialZoom: initialCenter != null ? 15 : 12,
                 ),
                 children: [
                   TileLayer(
@@ -196,9 +209,9 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                 ],
               ),
 
-              // FIXED SEARCH BAR — floats over the map, always visible.
+              // FIXED SEARCH BAR
               Positioned(
-                top: 16,
+                top: widget.focusLatitude != null ? 70 : 16,
                 left: 16,
                 right: 16,
                 child: Column(
@@ -268,6 +281,22 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                   ],
                 ),
               ),
+
+              // BACK BUTTON — only shown when this screen was pushed
+              // directly (e.g. from "View on map"), since in that case
+              // there's no bottom nav bar to rely on for navigation.
+              if (widget.focusLatitude != null)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.white,
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
             ],
           );
         },

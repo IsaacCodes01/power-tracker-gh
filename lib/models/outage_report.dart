@@ -1,7 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum OutageStatus { reported, investigating, repairing, restored }
+
 enum OutageSeverity { minor, moderate, major }
+
+enum OutageType { powerOutage, flickeringLights, voltageFluctuation, poleFault }
+
+String outageTypeLabel(OutageType type) {
+  switch (type) {
+    case OutageType.powerOutage:
+      return 'Power Outage';
+    case OutageType.flickeringLights:
+      return 'Flickering Lights';
+    case OutageType.voltageFluctuation:
+      return 'Voltage Fluctuation';
+    case OutageType.poleFault:
+      return 'Pole Fault';
+  }
+}
 
 class OutageReport {
   final String id;
@@ -13,6 +29,7 @@ class OutageReport {
   final DateTime? endTime;
   final OutageStatus status;
   final OutageSeverity severity;
+  final OutageType outageType;
   final DateTime? estimatedRestoration;
   final String description;
   final List<String> confirmedByUserIds;
@@ -29,6 +46,7 @@ class OutageReport {
     this.endTime,
     required this.status,
     required this.severity,
+    required this.outageType,
     this.estimatedRestoration,
     required this.description,
     this.confirmedByUserIds = const [],
@@ -36,7 +54,6 @@ class OutageReport {
     required this.createdAt,
   });
 
-  // Converts a Firestore document into an OutageReport object.
   factory OutageReport.fromMap(String id, Map<String, dynamic> data) {
     return OutageReport(
       id: id,
@@ -49,12 +66,16 @@ class OutageReport {
           ? (data['endTime'] as Timestamp).toDate()
           : null,
       status: OutageStatus.values.firstWhere(
-            (e) => e.name == data['status'],
+        (e) => e.name == data['status'],
         orElse: () => OutageStatus.reported,
       ),
       severity: OutageSeverity.values.firstWhere(
-            (e) => e.name == data['severity'],
+        (e) => e.name == data['severity'],
         orElse: () => OutageSeverity.minor,
+      ),
+      outageType: OutageType.values.firstWhere(
+        (e) => e.name == data['outageType'],
+        orElse: () => OutageType.powerOutage,
       ),
       estimatedRestoration: data['estimatedRestoration'] != null
           ? (data['estimatedRestoration'] as Timestamp).toDate()
@@ -66,7 +87,6 @@ class OutageReport {
     );
   }
 
-  // Converts this object into a Map for saving to Firestore.
   Map<String, dynamic> toMap() {
     return {
       'reporterId': reporterId,
@@ -77,6 +97,7 @@ class OutageReport {
       'endTime': endTime != null ? Timestamp.fromDate(endTime!) : null,
       'status': status.name,
       'severity': severity.name,
+      'outageType': outageType.name,
       'estimatedRestoration': estimatedRestoration != null
           ? Timestamp.fromDate(estimatedRestoration!)
           : null,
