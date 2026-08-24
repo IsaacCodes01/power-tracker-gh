@@ -3,7 +3,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../auth/login_screen.dart';
-import '../outage/outage_detail_screen.dart';
+import '../../widgets/outage_card.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onNavigateToReport;
@@ -14,39 +14,6 @@ class HomeScreen extends StatelessWidget {
     required this.onNavigateToReport,
     required this.onNavigateToOutages,
   });
-
-  Color _statusColor(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return Colors.green;
-      case OutageStatus.reported:
-        return Colors.redAccent;
-      case OutageStatus.investigating:
-        return Colors.orange;
-      case OutageStatus.repairing:
-        return Colors.blue;
-    }
-  }
-
-  String _statusLabel(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return 'Resolved';
-      case OutageStatus.reported:
-        return 'Reported';
-      case OutageStatus.investigating:
-        return 'Investigating';
-      case OutageStatus.repairing:
-        return 'Fixing';
-    }
-  }
-
-  String _timeAgo(DateTime dateTime) {
-    final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
-    if (diff.inHours < 24) return '${diff.inHours} hours ago';
-    return '${diff.inDays} days ago';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,12 +59,13 @@ class HomeScreen extends StatelessWidget {
           final activeCount = reports
               .where((r) => r.status != OutageStatus.restored)
               .length;
-          final resolvedTodayCount = reports.where((r) {
+          final resolvedLast24hCount = reports.where((r) {
             if (r.status != OutageStatus.restored) return false;
-            final now = DateTime.now();
-            return r.createdAt.year == now.year &&
-                r.createdAt.month == now.month &&
-                r.createdAt.day == now.day;
+            if (r.endTime == null) return false;
+            final hoursSinceResolved = DateTime.now()
+                .difference(r.endTime!)
+                .inHours;
+            return hoursSinceResolved < 24;
           }).length;
 
           // Only the 3 most recent reports, since Home is a quick glance.
@@ -140,8 +108,8 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildStatusCard(
-                        title: 'Resolved Today',
-                        value: '$resolvedTodayCount',
+                        title: 'Past 24H Resolved',
+                        value: '$resolvedLast24hCount',
                         icon: Icons.bolt,
                         color: Colors.green,
                       ),
@@ -220,22 +188,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   )
                 else
-                  ...recentReports.map(
-                    (report) => _buildOutageLogItem(
-                      location: report.area,
-                      time: _timeAgo(report.createdAt),
-                      status: _statusLabel(report.status),
-                      statusColor: _statusColor(report.status),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => OutageDetailScreen(report: report),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  ...recentReports.map((report) => OutageCard(report: report)),
               ],
             ),
           );
@@ -282,70 +235,6 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildOutageLogItem({
-    required String location,
-    required String time,
-    required String status,
-    required Color statusColor,
-    required VoidCallback onTap,
-  }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: onTap, // <--- LINK IT TO THE onTap ACTION HERE
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(14.0),
-          child: Row(
-            children: [
-              Icon(Icons.location_on, color: Colors.grey[400], size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      location,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      time,
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withAlpha(25),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

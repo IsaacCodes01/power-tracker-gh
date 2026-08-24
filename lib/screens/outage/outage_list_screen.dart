@@ -139,9 +139,14 @@ class _OutageListScreenState extends State<OutageListScreen> {
                   final activeCount = allReports
                       .where((r) => r.status != OutageStatus.restored)
                       .length;
-                  final resolvedCount = allReports
-                      .where((r) => r.status == OutageStatus.restored)
-                      .length;
+                  final resolvedCount = allReports.where((r) {
+                    if (r.status != OutageStatus.restored) return false;
+                    if (r.endTime == null) return false;
+                    final hoursSinceResolved = DateTime.now()
+                        .difference(r.endTime!)
+                        .inHours;
+                    return hoursSinceResolved < 24;
+                  }).length;
                   final filteredReports = _applyFilters(allReports);
 
                   return Column(
@@ -168,7 +173,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _buildOverviewCard(
-                              title: 'Resolved',
+                              title: 'Past 24H Resolved',
                               value: '$resolvedCount',
                               icon: Icons.bolt,
                               color: Colors.green,

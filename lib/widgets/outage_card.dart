@@ -22,6 +22,19 @@ class OutageCard extends StatelessWidget {
     }
   }
 
+  String _statusLabel(OutageStatus status) {
+    switch (status) {
+      case OutageStatus.restored:
+        return 'Resolved';
+      case OutageStatus.reported:
+        return 'Reported';
+      case OutageStatus.investigating:
+        return 'Investigating';
+      case OutageStatus.repairing:
+        return 'Fixing';
+    }
+  }
+
   String _timeAgo(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
     if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
@@ -69,9 +82,29 @@ class OutageCard extends StatelessWidget {
               children: [
                 const Icon(Icons.bolt, size: 16, color: Colors.deepPurple),
                 const SizedBox(width: 6),
-                Text(
-                  'Outage Type: ${outageTypeLabel(report.outageType)}',
-                  style: const TextStyle(fontSize: 13),
+                Expanded(
+                  child: Text(
+                    'Outage Type: ${outageTypeLabel(report.outageType)}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _statusColor(report.status).withAlpha(30),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _statusLabel(report.status),
+                    style: TextStyle(
+                      color: _statusColor(report.status),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -181,7 +214,7 @@ class OutageCard extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _statusColor(report.status),
+                      backgroundColor: Colors.deepPurple,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     onPressed: () {
