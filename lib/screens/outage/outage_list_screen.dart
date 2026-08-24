@@ -60,7 +60,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
     return '${diff.inDays} days ago';
   }
 
-  // Applies the currently selected chip AND the search box together.
   List<OutageReport> _applyFilters(List<OutageReport> reports) {
     var result = reports;
 
@@ -83,8 +82,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
         result = result.where((r) => r.confirmedByUserIds.isNotEmpty).toList();
         break;
       case ReportFilter.yourLocation:
-        // Placeholder for now — needs the user's saved area, which we
-        // haven't built a way to set yet (that's a future step).
         result = [];
         break;
       case ReportFilter.all:
@@ -112,178 +109,193 @@ class _OutageListScreenState extends State<OutageListScreen> {
         elevation: 0,
         foregroundColor: Colors.black87,
       ),
-      body: StreamBuilder<List<OutageReport>>(
-        stream: _firestoreService.streamReports(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final allReports = snapshot.data ?? [];
-          final activeCount = allReports
-              .where((r) => r.status != OutageStatus.restored)
-              .length;
-          final resolvedCount = allReports
-              .where((r) => r.status == OutageStatus.restored)
-              .length;
-          final filteredReports = _applyFilters(allReports);
-
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // SEARCH BAR
-                TextField(
-                  controller: _searchController,
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  decoration: InputDecoration(
-                    hintText: 'Search reports by area...',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // SEARCH BAR — now lives outside the StreamBuilder, so it
+            // never rebuilds just because Firestore emits new data.
+            // This is what keeps the keyboard focus stable while typing.
+            TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search reports by area...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                const SizedBox(height: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
 
-                // FILTER CHIPS
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+            // FILTER CHIPS — same reasoning, built once, not rebuilt
+            // by Firestore's stream emissions.
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('All', ReportFilter.all),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Your Reports', ReportFilter.mine),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('No Light', ReportFilter.noLight),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Restored', ReportFilter.restored),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Confirmed', ReportFilter.confirmed),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('Your Location', ReportFilter.yourLocation),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Everything below this point genuinely needs live data,
+            // so it's the only part still wrapped in StreamBuilder.
+            Expanded(
+              child: StreamBuilder<List<OutageReport>>(
+                stream: _firestoreService.streamReports(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  final allReports = snapshot.data ?? [];
+                  final activeCount = allReports
+                      .where((r) => r.status != OutageStatus.restored)
+                      .length;
+                  final resolvedCount = allReports
+                      .where((r) => r.status == OutageStatus.restored)
+                      .length;
+                  final filteredReports = _applyFilters(allReports);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildFilterChip('All', ReportFilter.all),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Your Reports', ReportFilter.mine),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('No Light', ReportFilter.noLight),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Restored', ReportFilter.restored),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Confirmed', ReportFilter.confirmed),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(
-                        'Your Location',
-                        ReportFilter.yourLocation,
+                      const Text(
+                        'Overview',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // OVERVIEW CARDS
-                const Text(
-                  'Overview',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildOverviewCard(
-                        title: 'Active Outages',
-                        value: '$activeCount',
-                        icon: Icons.flash_off,
-                        color: Colors.redAccent,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildOverviewCard(
-                        title: 'Resolved',
-                        value: '$resolvedCount',
-                        icon: Icons.bolt,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // FILTERED LIST
-                Text(
-                  'Recent Reports (${filteredReports.length})',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                Expanded(
-                  child: filteredReports.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No reports found.',
-                            style: TextStyle(color: Colors.grey),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildOverviewCard(
+                              title: 'Active Outages',
+                              value: '$activeCount',
+                              icon: Icons.flash_off,
+                              color: Colors.redAccent,
+                            ),
                           ),
-                        )
-                      : ListView.builder(
-                          itemCount: filteredReports.length,
-                          itemBuilder: (context, index) {
-                            final report = filteredReports[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ListTile(
-                                leading: Icon(
-                                  Icons.location_on,
-                                  color: Colors.grey[400],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildOverviewCard(
+                              title: 'Resolved',
+                              value: '$resolvedCount',
+                              icon: Icons.bolt,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      Text(
+                        'Recent Reports (${filteredReports.length})',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Expanded(
+                        child: filteredReports.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'No reports found.',
+                                  style: TextStyle(color: Colors.grey),
                                 ),
-                                title: Text(
-                                  report.area,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Text(_timeAgo(report.createdAt)),
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _statusColor(
-                                      report.status,
-                                    ).withAlpha(25),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    _statusLabel(report.status),
-                                    style: TextStyle(
-                                      color: _statusColor(report.status),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
+                              )
+                            : ListView.builder(
+                                itemCount: filteredReports.length,
+                                itemBuilder: (context, index) {
+                                  final report = filteredReports[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                  ),
-                                ),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          OutageDetailScreen(report: report),
+                                    child: ListTile(
+                                      leading: Icon(
+                                        Icons.location_on,
+                                        color: Colors.grey[400],
+                                      ),
+                                      title: Text(
+                                        report.area,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        _timeAgo(report.createdAt),
+                                      ),
+                                      trailing: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: _statusColor(
+                                            report.status,
+                                          ).withAlpha(25),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _statusLabel(report.status),
+                                          style: TextStyle(
+                                            color: _statusColor(report.status),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => OutageDetailScreen(
+                                              report: report,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   );
                                 },
                               ),
-                            );
-                          },
-                        ),
-                ),
-              ],
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

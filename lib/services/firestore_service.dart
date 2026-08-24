@@ -92,4 +92,22 @@ class FirestoreService {
   ) async {
     await _usersRef.doc(uid).update(updates);
   }
+
+  // ==========================================
+  //          DEFAULT USER LOCATION METHODS
+  // ==========================================
+
+  // Saves a user's chosen default location coordinates to their profile document
+  Future<void> saveDefaultLocation(
+    String uid,
+    double lat,
+    double lon,
+    String addressName,
+  ) async {
+    await _usersRef.doc(uid).update({
+      'defaultLatitude': lat,
+      'defaultLongitude': lon,
+      'defaultLocationName': addressName,
+    });
+  }
 }
