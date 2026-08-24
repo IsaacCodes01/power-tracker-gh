@@ -2,11 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/firestore_service.dart';
+import '../../services/location_service.dart';
 import '../../models/outage_report.dart';
 import '../outage/outage_detail_screen.dart';
 
-class OutageMapScreen extends StatelessWidget {
+class OutageMapScreen extends StatefulWidget {
   const OutageMapScreen({super.key});
+
+  @override
+  State<OutageMapScreen> createState() => _OutageMapScreenState();
+}
+
+class _OutageMapScreenState extends State<OutageMapScreen> {
+  final _mapController = MapController();
+  final _locationService = LocationService();
+  final _searchController = TextEditingController();
+
+  bool _isSearching = false;
+  String? _searchError;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Color _statusColor(OutageStatus status) {
     switch (status) {
@@ -19,6 +38,29 @@ class OutageMapScreen extends StatelessWidget {
       case OutageStatus.repairing:
         return Colors.blue;
     }
+  }
+
+  Future<void> _handleSearch() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+      _searchError = null;
+    });
+
+    final coordinates = await _locationService.getCoordinatesFromArea(query);
+
+    if (coordinates != null) {
+      _mapController.move(
+        LatLng(coordinates['latitude']!, coordinates['longitude']!),
+        14,
+      );
+    } else {
+      setState(() => _searchError = 'Area not found. Try a different name.');
+    }
+
+    if (mounted) setState(() => _isSearching = false);
   }
 
   void _showReportPreview(BuildContext context, OutageReport report) {
@@ -75,7 +117,7 @@ class OutageMapScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(context); // close the bottom sheet
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -96,18 +138,10 @@ class OutageMapScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final firestoreService = FirestoreService();
-
-    // Default view centers on Accra until real report pins load in.
     final defaultCenter = LatLng(5.6037, -0.1870);
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      appBar: AppBar(
-        title: const Text('Outage Map'),
-        backgroundColor: Colors.grey[100],
-        elevation: 0,
-        foregroundColor: Colors.black87,
-      ),
       body: StreamBuilder<List<OutageReport>>(
         stream: firestoreService.streamReports(),
         builder: (context, snapshot) {
@@ -119,44 +153,120 @@ class OutageMapScreen extends StatelessWidget {
           }
 
           final allReports = snapshot.data ?? [];
-
-          // Only show pins for reports that actually have real
-          // coordinates — skip any still sitting at the 0,0 fallback.
           final mappableReports = allReports
               .where((r) => r.latitude != 0.0 && r.longitude != 0.0)
               .toList();
 
-          return FlutterMap(
-            options: MapOptions(
-              initialCenter: mappableReports.isNotEmpty
-                  ? LatLng(
-                      mappableReports.first.latitude,
-                      mappableReports.first.longitude,
-                    )
-                  : defaultCenter,
-              initialZoom: 12,
-            ),
+          return Stack(
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.isaacotabil.powertrackergh',
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: mappableReports.isNotEmpty
+                      ? LatLng(
+                          mappableReports.first.latitude,
+                          mappableReports.first.longitude,
+                        )
+                      : defaultCenter,
+                  initialZoom: 12,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.isaacotabil.powertrackergh',
+                  ),
+                  MarkerLayer(
+                    markers: mappableReports.map((report) {
+                      return Marker(
+                        point: LatLng(report.latitude, report.longitude),
+                        width: 40,
+                        height: 40,
+                        child: GestureDetector(
+                          onTap: () => _showReportPreview(context, report),
+                          child: Icon(
+                            Icons.location_on,
+                            color: _statusColor(report.status),
+                            size: 40,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ),
-              MarkerLayer(
-                markers: mappableReports.map((report) {
-                  return Marker(
-                    point: LatLng(report.latitude, report.longitude),
-                    width: 40,
-                    height: 40,
-                    child: GestureDetector(
-                      onTap: () => _showReportPreview(context, report),
-                      child: Icon(
-                        Icons.location_on,
-                        color: _statusColor(report.status),
-                        size: 40,
+
+              // FIXED SEARCH BAR — floats over the map, always visible.
+              Positioned(
+                top: 16,
+                left: 16,
+                right: 16,
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(25),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onSubmitted: (_) => _handleSearch(),
+                        decoration: InputDecoration(
+                          hintText: 'Search an area on the map...',
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Colors.deepPurple,
+                          ),
+                          suffixIcon: _isSearching
+                              ? const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.arrow_forward),
+                                  onPressed: _handleSearch,
+                                ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
+                        ),
                       ),
                     ),
-                  );
-                }).toList(),
+                    if (_searchError != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _searchError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           );
