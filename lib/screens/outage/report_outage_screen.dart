@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
-import '../../services/location_service.dart';
-
-// 1. FIXED: Added this import statement so the file can recognize MainNavigationScreen
+import 'location_picker_screen.dart';
 import '../main_navigation_screen.dart';
 
 class ReportOutageScreen extends StatefulWidget {
@@ -16,48 +14,74 @@ class ReportOutageScreen extends StatefulWidget {
 
 class _ReportOutageScreenState extends State<ReportOutageScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _areaController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
-  final _locationService = LocationService();
+
+  String? _selectedAreaName;
+  double? _selectedLatitude;
+  double? _selectedLongitude;
 
   OutageType _selectedOutageType = OutageType.powerOutage;
   TimeOfDay _selectedTime = TimeOfDay.now();
-
   OutageSeverity _selectedSeverity = OutageSeverity.minor;
   bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _areaController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => const LocationPickerScreen()),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedAreaName = result['name'];
+        _selectedLatitude = result['latitude'];
+        _selectedLongitude = result['longitude'];
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime,
+    );
+    if (picked != null) {
+      setState(() => _selectedTime = picked);
+    }
   }
 
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedAreaName == null ||
+        _selectedLatitude == null ||
+        _selectedLongitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a location first')),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final currentUser = _authService.currentUser;
-    final areaText = _areaController.text.trim();
-
-    // Look up real coordinates for the typed area before saving.
-    final coordinates = await _locationService.getCoordinatesFromArea(areaText);
 
     final newReport = OutageReport(
       id: '',
-      // Firestore assigns this automatically, so left blank here.
       reporterId: currentUser?.uid ?? '',
-      area: areaText,
+      area: _selectedAreaName!,
       confirmedByUserIds: currentUser != null ? [currentUser.uid] : [],
-      latitude: coordinates?['latitude'] ?? 0.0,
-      longitude: coordinates?['longitude'] ?? 0.0,
-      // If the lookup succeeded, use real coordinates. If it failed
-      // (no internet, area not found), fall back to 0,0 rather than
-      // blocking the whole report from being submitted.
+      latitude: _selectedLatitude!,
+      longitude: _selectedLongitude!,
       startTime: DateTime(
         DateTime.now().year,
         DateTime.now().month,
@@ -76,11 +100,9 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       await _firestoreService.createReport(newReport);
       if (!mounted) return;
 
-      // FIXED: Checks if there is a history trail to pop. If not, it falls back safely.
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
       } else {
-        // If nested inside tabs with no back history, instantly force a clean slide back
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
@@ -95,16 +117,6 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
-  } // <--- 2. FIXED: THIS CLOSING BRACE WAS MISSING IN YOUR FILE TO CLOSE _handleSubmit!
-
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
-    );
-    if (picked != null) {
-      setState(() => _selectedTime = picked);
-    }
   }
 
   @override
@@ -118,19 +130,23 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
             key: _formKey,
             child: ListView(
               children: [
-                TextFormField(
-                  controller: _areaController,
-                  decoration: const InputDecoration(
-                    labelText: 'Area / Location',
-                    hintText: 'e.g. Madina, Accra',
-                    border: OutlineInputBorder(),
+                InkWell(
+                  onTap: _pickLocation,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Area / Location',
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.chevron_right),
+                    ),
+                    child: Text(
+                      _selectedAreaName ?? 'Tap to select a location',
+                      style: TextStyle(
+                        color: _selectedAreaName != null
+                            ? Colors.black87
+                            : Colors.grey[500],
+                      ),
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter the affected area';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -161,7 +177,6 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const SizedBox(height: 20),
                 const Text(
                   'Outage Type',
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -184,6 +199,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     }
                   },
                 ),
+                const SizedBox(height: 20),
 
                 TextFormField(
                   controller: _descriptionController,
@@ -201,9 +217,8 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 28),
-
                 const SizedBox(height: 20),
+
                 const Text(
                   'Outage Time',
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -229,6 +244,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 28),
 
                 SizedBox(
                   height: 48,

@@ -60,7 +60,7 @@ class OutageCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.location_on, size: 18, color: Colors.grey[500]),
+                Icon(Icons.location_on, size: 18, color: Colors.red[500]),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -116,7 +116,7 @@ class OutageCard extends StatelessWidget {
                   Icon(
                     Icons.description_outlined,
                     size: 16,
-                    color: Colors.grey[500],
+                    color: Colors.black,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -135,7 +135,7 @@ class OutageCard extends StatelessWidget {
             // so it's accurate even if the avatar lookup below fails.
             Row(
               children: [
-                Icon(Icons.people_outline, size: 16, color: Colors.grey[600]),
+                Icon(Icons.people_outline, size: 16, color: Colors.pink[600]),
                 const SizedBox(width: 6),
                 Text(
                   '$confirmedCount household${confirmedCount == 1 ? '' : 's'} affected',

@@ -5,6 +5,9 @@ class AppUser {
   final String email;
   final String role;
   final List<String> savedAreas;
+  final double? defaultLatitude;
+  final double? defaultLongitude;
+  final String? defaultLocationName;
   final DateTime createdAt;
 
   // ADDED: The new optional phoneNumber property
@@ -15,6 +18,9 @@ class AppUser {
     required this.email,
     required this.role,
     this.savedAreas = const [],
+    this.defaultLatitude,
+    this.defaultLongitude,
+    this.defaultLocationName,
     required this.createdAt,
     this.phoneNumber = '', // Default to an empty string if not provided
   });
@@ -26,6 +32,9 @@ class AppUser {
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
       savedAreas: List<String>.from(data['savedAreas'] ?? []),
+      defaultLatitude: (data['defaultLatitude'] as num?)?.toDouble(),
+      defaultLongitude: (data['defaultLongitude'] as num?)?.toDouble(),
+      defaultLocationName: data['defaultLocationName'],
       createdAt: data['createdAt'] != null
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
@@ -41,6 +50,9 @@ class AppUser {
       'email': email,
       'role': role,
       'savedAreas': savedAreas,
+      'defaultLatitude': defaultLatitude,
+      'defaultLongitude': defaultLongitude,
+      'defaultLocationName': defaultLocationName,
       'createdAt': Timestamp.fromDate(createdAt),
       // FIXED: Packs the phone number string into your database upload map
       'phoneNumber': phoneNumber,
@@ -48,4 +60,8 @@ class AppUser {
   }
 
   bool get isAdmin => role == 'admin';
+
+  // True once the user has genuinely set a default location at least once.
+  bool get hasDefaultLocation =>
+      defaultLatitude != null && defaultLongitude != null;
 }

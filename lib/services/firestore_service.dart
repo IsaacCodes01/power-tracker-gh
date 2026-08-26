@@ -8,11 +8,6 @@ class FirestoreService {
     'outage_reports',
   );
 
-  // ADDED: Reference to the users collection in your database
-  final CollectionReference _usersRef = FirebaseFirestore.instance.collection(
-    'users',
-  );
-
   // CREATE: files a new form into the cabinet.
   Future<void> createReport(OutageReport report) async {
     await _reportsRef.add(report.toMap());
@@ -69,18 +64,22 @@ class FirestoreService {
     await _reportsRef.doc(reportId).update({'verified': true});
   }
 
+  final CollectionReference _usersRef = FirebaseFirestore.instance.collection(
+    'users',
+  );
+
   // Looks up initials (first letter of email) for a list of user IDs,
   // used to show small avatar bubbles on report cards.
   Future<List<String>> getUserInitials(List<String> uids) async {
     if (uids.isEmpty) return [];
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
+    final snapshot = await _usersRef
         .where(FieldPath.documentId, whereIn: uids.take(10).toList())
         .get();
 
     return snapshot.docs.map((doc) {
-      final email = doc.data()['email'] as String? ?? '?';
+      final data = doc.data() as Map<String, dynamic>;
+      final email = data['email'] as String? ?? '?';
       return email.substring(0, 1).toUpperCase();
     }).toList();
   }
@@ -118,12 +117,12 @@ class FirestoreService {
     String uid,
     double lat,
     double lon,
-    String addressName,
+    String locationName,
   ) async {
     await _usersRef.doc(uid).update({
       'defaultLatitude': lat,
       'defaultLongitude': lon,
-      'defaultLocationName': addressName,
+      'defaultLocationName': locationName,
     });
   }
 }
