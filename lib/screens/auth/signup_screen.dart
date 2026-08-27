@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Required for inputFormatters
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_snackbar.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -79,7 +80,6 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     // 1. FIXED: Pre-capture your UI states before the async operations run!
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     try {
@@ -97,12 +97,15 @@ class _SignupScreenState extends State<SignupScreen> {
       await _authService.signOut();
 
       // 4. FIXED: Safe execution trail using your clean pre-loaded instances!
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully! Please log in.'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'Account created successfully! Please log in.',
+          type: AppMessageType.success,
+        );
+      }
+
+      navigator.pop();
 
       navigator.pop();
     } catch (e) {
@@ -112,15 +115,15 @@ class _SignupScreenState extends State<SignupScreen> {
         await _authService.signOut();
 
         // 5. FIXED: Safe custom developer error display handlers
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Account registered! Please log in to your dashboard.',
-            ),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        if (mounted) {
+          AppSnackbar.show(
+            context,
+            message: 'Account registered! Please log in to your dashboard.',
+            type: AppMessageType.info,
+          );
+        }
         navigator.pop();
+
         return;
       }
 

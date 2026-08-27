@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_snackbar.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -23,9 +24,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _sent = true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppSnackbar.show(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to send link: $e')));
+        message: 'Failed to send link: $e',
+        type: AppMessageType.error,
+      );
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -39,9 +42,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Change Password'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),

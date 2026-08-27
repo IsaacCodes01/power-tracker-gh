@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/app_snackbar.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -35,6 +36,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await _authService.resetPassword(_emailController.text.trim());
       setState(() => _emailSent = true);
     } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'Failed to send link: $e',
+        type: AppMessageType.error,
+      );
       setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -103,10 +110,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       onPressed: _isLoading ? null : _handleReset,
                       child: _isLoading
                           ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Text('Send Reset Link'),
                     ),
                   ),

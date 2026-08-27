@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
+import '../../widgets/app_snackbar.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -49,9 +50,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (confirmed == true) {
       await _firestoreService.deleteReport(report.id);
       if (mounted) {
-        ScaffoldMessenger.of(
+        AppSnackbar.show(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Report deleted')));
+          message: 'Report deleted',
+          type: AppMessageType.success,
+        );
       }
     }
   }

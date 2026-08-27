@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/reauth_dialog.dart';
+import '../../widgets/app_snackbar.dart';
 
 class PersonalInformationScreen extends StatefulWidget {
   const PersonalInformationScreen({super.key});
@@ -78,12 +80,17 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
     setState(() => _isSaving = true);
 
-    final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     try {
       final newEmail = _emailController.text.trim();
       final newPhone = number.phoneNumber?.trim() ?? '';
+
+      final confirmed = await showReauthDialog(context);
+      if (!confirmed) {
+        setState(() => _isSaving = false);
+        return;
+      }
 
       if (newEmail != _authService.currentUser?.email) {
         await _authService.updateEmail(newEmail);
@@ -94,20 +101,22 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         'phoneNumber': newPhone,
       });
 
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Personal information updated successfully! ✅'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'Personal information updated successfully!',
+          type: AppMessageType.success,
+        );
+      }
       navigator.pop();
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Update failed: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'Update failed: $e',
+          type: AppMessageType.error,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -123,9 +132,9 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Personal Information'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       // FIXED: Swapped out FutureBuilder for a clean, deterministic local state check
       body: _isLoadingData

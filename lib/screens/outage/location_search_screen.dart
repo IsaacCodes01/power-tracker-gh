@@ -56,9 +56,9 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Search Different Location'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
+import '../../widgets/app_snackbar.dart';
 
 class OutageDetailScreen extends StatefulWidget {
   final OutageReport report;
@@ -148,9 +149,11 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(
+      AppSnackbar.show(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Marked as restored')));
+        message: 'Marked as restored',
+        type: AppMessageType.info,
+      );
     }
   }
 
@@ -160,9 +163,9 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(_report.area),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

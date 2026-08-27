@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
+import '../../widgets/app_snackbar.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,8 +43,17 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+
       // That's it — AppGatekeeper's authStateChanges stream will
       // automatically detect the successful login and swap screens.
+
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'Login successful',
+          type: AppMessageType.success,
+        );
+      }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();

@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/location_service.dart';
 import 'location_search_screen.dart';
+import '../../widgets/app_snackbar.dart';
 
 enum LocationChoice { current, different }
 
@@ -72,6 +73,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     if (_resultLat == null || _resultLon == null || _resultName == null) {
       return;
     }
+
+    AppSnackbar.show(
+      context,
+      message: 'Location set: $_resultName',
+      type: AppMessageType.success,
+    );
+
     Navigator.pop(context, {
       'name': _resultName,
       'latitude': _resultLat,
@@ -85,9 +93,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Set Your Location'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

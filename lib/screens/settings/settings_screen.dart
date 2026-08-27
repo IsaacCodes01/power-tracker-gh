@@ -5,6 +5,7 @@ import 'personal_information_screen.dart';
 import 'change_password_screen.dart';
 import 'notifications_screen.dart';
 import '../../widgets/reauth_dialog.dart';
+import '../../widgets/app_snackbar.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -27,9 +28,9 @@ class SettingsScreen extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -211,9 +212,11 @@ class SettingsScreen extends StatelessWidget {
         );
       } catch (e) {
         if (!context.mounted) return;
-        ScaffoldMessenger.of(
+        AppSnackbar.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to delete account: $e')));
+          message: 'Failed to delete account: $e',
+          type: AppMessageType.error,
+        );
       }
     }
   }

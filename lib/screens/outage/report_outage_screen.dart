@@ -4,6 +4,7 @@ import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import 'location_picker_screen.dart';
 import '../main_navigation_screen.dart';
+import '../../widgets/app_snackbar.dart';
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -100,6 +101,12 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       await _firestoreService.createReport(newReport);
       if (!mounted) return;
 
+      AppSnackbar.show(
+        context,
+        message: 'Report created successfully',
+        type: AppMessageType.success,
+      );
+
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
       } else {
@@ -122,7 +129,11 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Report an Outage')),
+      appBar: AppBar(
+        title: const Text('Report an Outage'),
+        backgroundColor: Colors.deepPurple,
+        foregroundColor: Colors.white,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),

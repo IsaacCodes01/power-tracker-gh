@@ -72,9 +72,9 @@ class _OutageListScreenState extends State<OutageListScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Outage Reports'),
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.deepPurple,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
