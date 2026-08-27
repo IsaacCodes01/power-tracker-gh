@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
@@ -21,7 +23,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
   bool _isLoadingRole = true;
   bool _isUpdating = false;
 
-  late OutageReport _report; // Local copy so we can update it live on screen.
+  late OutageReport _report;
 
   @override
   void initState() {
@@ -52,6 +54,39 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
   bool get _hasConfirmed {
     final uid = _authService.currentUser?.uid;
     return uid != null && _report.confirmedByUserIds.contains(uid);
+  }
+
+  Color _statusColor(OutageStatus status) {
+    switch (status) {
+      case OutageStatus.restored:
+        return Colors.green;
+      case OutageStatus.reported:
+        return Colors.redAccent;
+      case OutageStatus.investigating:
+        return Colors.orange;
+      case OutageStatus.repairing:
+        return Colors.blue;
+    }
+  }
+
+  String _statusLabel(OutageStatus status) {
+    switch (status) {
+      case OutageStatus.restored:
+        return 'Resolved';
+      case OutageStatus.reported:
+        return 'Reported';
+      case OutageStatus.investigating:
+        return 'Investigating';
+      case OutageStatus.repairing:
+        return 'Fixing';
+    }
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
   }
 
   Future<void> _confirmOutage() async {
@@ -115,20 +150,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
     if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Marked as restored ✓')));
-    }
-  }
-
-  Color _statusColor(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return Colors.green;
-      case OutageStatus.reported:
-        return Colors.redAccent;
-      case OutageStatus.investigating:
-        return Colors.orange;
-      case OutageStatus.repairing:
-        return Colors.blue;
+      ).showSnackBar(const SnackBar(content: Text('Marked as restored')));
     }
   }
 
@@ -142,55 +164,263 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
         elevation: 0,
         foregroundColor: Colors.black87,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // STATUS BADGE
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: _statusColor(_report.status).withAlpha(30),
-                borderRadius: BorderRadius.circular(20),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade200, width: 1.2),
               ),
-              child: Text(
-                _report.status.name.toUpperCase(),
-                style: TextStyle(
-                  color: _statusColor(_report.status),
-                  fontWeight: FontWeight.bold,
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // STATUS + TIME
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _statusColor(_report.status).withAlpha(30),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _statusLabel(_report.status),
+                          style: TextStyle(
+                            color: _statusColor(_report.status),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _timeAgo(_report.createdAt),
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // SEVERITY + TYPE
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Severity',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _report.severity.name[0].toUpperCase() +
+                                    _report.severity.name.substring(1),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Type',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                outageTypeLabel(_report.outageType),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // DESCRIPTION
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.description_outlined,
+                        size: 16,
+                        color: Colors.grey[500],
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _report.description,
+                          style: const TextStyle(fontSize: 13, height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // MAP PREVIEW
+                  if (_report.latitude != 0.0 && _report.longitude != 0.0)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        height: 120,
+                        child: IgnorePointer(
+                          child: FlutterMap(
+                            options: MapOptions(
+                              initialCenter: LatLng(
+                                _report.latitude,
+                                _report.longitude,
+                              ),
+                              initialZoom: 15,
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName:
+                                    'com.isaacotabil.powertrackergh',
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: LatLng(
+                                      _report.latitude,
+                                      _report.longitude,
+                                    ),
+                                    width: 34,
+                                    height: 34,
+                                    child: Icon(
+                                      Icons.location_pin,
+                                      color: _statusColor(_report.status),
+                                      size: 34,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+
+                  // CONFIRMED-BY AVATARS
+                  FutureBuilder<List<String>>(
+                    future: _firestoreService.getUserInitials(
+                      _report.confirmedByUserIds,
+                    ),
+                    builder: (context, snapshot) {
+                      final count = _report.confirmedByUserIds.length;
+                      final initials = snapshot.data;
+                      return Row(
+                        children: [
+                          if (count > 0)
+                            SizedBox(
+                              height: 26,
+                              width: count * 16.0 + 14,
+                              child: Stack(
+                                children: List.generate(count, (i) {
+                                  final label =
+                                      (initials != null && i < initials.length)
+                                      ? initials[i]
+                                      : '?';
+                                  return Positioned(
+                                    left: i * 16.0,
+                                    child: CircleAvatar(
+                                      radius: 13,
+                                      backgroundColor: Colors.deepPurple[200],
+                                      child: Text(
+                                        label,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '$count household${count == 1 ? '' : 's'} affected',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // CONFIRM BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_isUpdating || _hasConfirmed)
+                    ? null
+                    : _confirmOutage,
+                icon: const Icon(Icons.people, size: 18),
+                label: Text(
+                  _hasConfirmed ? 'You confirmed this' : "I'm also affected",
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
 
-            _infoRow('Severity', _report.severity.name),
-            _infoRow('Reported', _report.startTime.toString()),
-            if (_report.endTime != null)
-              _infoRow('Restored', _report.endTime.toString()),
-            const SizedBox(height: 12),
-
-            const Text(
-              'Description',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 6),
-            Text(_report.description),
-            const SizedBox(height: 24),
-
-            // CONFIRM BUTTON
-            OutlinedButton.icon(
-              onPressed: (_isUpdating || _hasConfirmed) ? null : _confirmOutage,
-              icon: const Icon(Icons.people),
-              label: Text(
-                _hasConfirmed
-                    ? 'You confirmed this (${_report.confirmedByUserIds.length} total)'
-                    : 'I\'m also affected (${_report.confirmedByUserIds.length})',
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // MARK AS RESTORED — only visible to reporter or admin
+            // MARK AS RESTORED — reporter or admin only
             if (!_isLoadingRole &&
                 _canMarkRestored &&
                 _report.status != OutageStatus.restored)
@@ -198,34 +428,17 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _isUpdating ? null : _markAsRestored,
-                  icon: const Icon(Icons.check_circle),
+                  icon: const Icon(Icons.check_circle, size: 18),
                   label: const Text('Mark as Restored'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.deepPurple,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600], fontSize: 13),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
       ),
     );
   }
