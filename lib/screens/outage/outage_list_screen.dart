@@ -3,6 +3,7 @@ import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/outage_card.dart';
+import '../../widgets/notification_bell.dart';
 
 enum ReportFilter { all, mine, restored, noLight, confirmed, yourLocation }
 
@@ -59,7 +60,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
       result = result
           .where(
             (r) => r.area.toLowerCase().contains(_searchQuery.toLowerCase()),
-          )
+      )
           .toList();
     }
 
@@ -75,6 +76,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
         backgroundColor: Colors.deepPurple,
         elevation: 0,
         foregroundColor: Colors.white,
+        actions: const [NotificationBell()],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -142,7 +144,8 @@ class _OutageListScreenState extends State<OutageListScreen> {
                   final resolvedCount = allReports.where((r) {
                     if (r.status != OutageStatus.restored) return false;
                     if (r.endTime == null) return false;
-                    final hoursSinceResolved = DateTime.now()
+                    final hoursSinceResolved = DateTime
+                        .now()
                         .difference(r.endTime!)
                         .inHours;
                     return hoursSinceResolved < 24;
@@ -195,18 +198,18 @@ class _OutageListScreenState extends State<OutageListScreen> {
                       Expanded(
                         child: filteredReports.isEmpty
                             ? const Center(
-                                child: Text(
-                                  'No reports found.',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              )
+                          child: Text(
+                            'No reports found.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        )
                             : ListView.builder(
-                                itemCount: filteredReports.length,
-                                itemBuilder: (context, index) {
-                                  final report = filteredReports[index];
-                                  return OutageCard(report: report);
-                                },
-                              ),
+                          itemCount: filteredReports.length,
+                          itemBuilder: (context, index) {
+                            final report = filteredReports[index];
+                            return OutageCard(report: report);
+                          },
+                        ),
                       ),
                     ],
                   );

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
-import '../auth/login_screen.dart';
 import '../../widgets/outage_card.dart';
+import '../../widgets/notification_bell.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onNavigateToReport;
@@ -17,7 +16,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
     final firestoreService = FirestoreService();
 
     return Scaffold(
@@ -27,21 +25,7 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: Colors.deepPurple,
         elevation: 0,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () async {
-              await authService.signOut();
-              if (context.mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
-          ),
-        ],
+        actions: const [NotificationBell()],
       ),
       body: StreamBuilder<List<OutageReport>>(
         stream: firestoreService.streamReports(),
@@ -62,7 +46,8 @@ class HomeScreen extends StatelessWidget {
           final resolvedLast24hCount = reports.where((r) {
             if (r.status != OutageStatus.restored) return false;
             if (r.endTime == null) return false;
-            final hoursSinceResolved = DateTime.now()
+            final hoursSinceResolved = DateTime
+                .now()
                 .difference(r.endTime!)
                 .inHours;
             return hoursSinceResolved < 24;

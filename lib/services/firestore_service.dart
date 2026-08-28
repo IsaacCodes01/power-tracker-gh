@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/outage_report.dart';
 import '../models/app_user.dart'; // ADDED: Import your user model
+import '../models/notification_item.dart';
 
 class FirestoreService {
   final CollectionReference _reportsRef = FirebaseFirestore.instance.collection(
@@ -12,6 +13,57 @@ class FirestoreService {
   Future<void> createReport(OutageReport report) async {
     await _reportsRef.add(report.toMap());
   }
+
+  // Writes a new notification for a specific user.
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String message,
+    String? relatedReportId,
+  }) async {
+    await _notificationsRef.add({
+      'userId': userId,
+      'title': title,
+      'message': message,
+      'read': false,
+      'relatedReportId': relatedReportId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Live list of one user's notifications, newest first.
+  Stream<List<NotificationItem>> streamNotifications(String userId) {
+    return _notificationsRef
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => NotificationItem.fromMap(
+                  doc.id,
+                  doc.data() as Map<String, dynamic>,
+                ),
+              )
+              .toList(),
+        );
+  }
+
+  // Live count of unread notifications, used for the red badge.
+  Stream<int> streamUnreadCount(String userId) {
+    return _notificationsRef
+        .where('userId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _notificationsRef.doc(notificationId).update({'read': true});
+  }
+
+  final CollectionReference _notificationsRef = FirebaseFirestore.instance
+      .collection('notifications');
 
   // READ (live list): keeps watching the cabinet and hands back
   // an updated list automatically whenever anything changes.

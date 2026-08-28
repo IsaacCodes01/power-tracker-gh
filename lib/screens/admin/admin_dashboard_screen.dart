@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../widgets/notification_bell.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -68,6 +69,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         backgroundColor: Colors.grey[100],
         elevation: 0,
         foregroundColor: Colors.black87,
+        actions: const [NotificationBell()],
       ),
       body: StreamBuilder<List<OutageReport>>(
         stream: _firestoreService.streamReports(),
@@ -155,6 +157,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   : () async {
                                       await _firestoreService.verifyReport(
                                         report.id,
+                                      );
+                                      await _firestoreService.createNotification(
+                                        userId: report.reporterId,
+                                        title: 'Report Verified',
+                                        message:
+                                            'Your report for ${report.area} has been verified.',
+                                        relatedReportId: report.id,
                                       );
                                     },
                               icon: Icon(

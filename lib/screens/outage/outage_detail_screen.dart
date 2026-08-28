@@ -127,6 +127,17 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
       'endTime': Timestamp.now(),
     });
 
+    // Notify everyone who confirmed this outage that it's now restored.
+    for (final uid in _report.confirmedByUserIds) {
+      if (uid == _authService.currentUser?.uid) continue;
+      await _firestoreService.createNotification(
+        userId: uid,
+        title: 'Power Restored',
+        message: '${_report.area} has been marked as restored.',
+        relatedReportId: _report.id,
+      );
+    }
+
     setState(() {
       _report = OutageReport(
         id: _report.id,

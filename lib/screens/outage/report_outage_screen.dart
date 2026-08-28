@@ -5,6 +5,7 @@ import '../../models/outage_report.dart';
 import 'location_picker_screen.dart';
 import '../main_navigation_screen.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../widgets/notification_bell.dart';
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -84,9 +85,15 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       latitude: _selectedLatitude!,
       longitude: _selectedLongitude!,
       startTime: DateTime(
-        DateTime.now().year,
-        DateTime.now().month,
-        DateTime.now().day,
+        DateTime
+            .now()
+            .year,
+        DateTime
+            .now()
+            .month,
+        DateTime
+            .now()
+            .day,
         _selectedTime.hour,
         _selectedTime.minute,
       ),
@@ -113,7 +120,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-          (route) => false,
+              (route) => false,
         );
       }
     } catch (e) {
@@ -133,6 +140,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
         title: const Text('Report an Outage'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        actions: const [NotificationBell()],
       ),
       body: SafeArea(
         child: Padding(
@@ -222,7 +230,9 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     alignLabelWithHint: true,
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value
+                        .trim()
+                        .isEmpty) {
                       return 'Please add a short description';
                     }
                     return null;
@@ -263,10 +273,10 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     onPressed: _isSubmitting ? null : _handleSubmit,
                     child: _isSubmitting
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                         : const Text('Submit Report'),
                   ),
                 ),
