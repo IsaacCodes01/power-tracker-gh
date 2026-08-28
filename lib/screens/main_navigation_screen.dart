@@ -6,6 +6,8 @@ import 'outage/report_outage_screen.dart';
 import 'admin/admin_dashboard_screen.dart';
 import '../services/auth_service.dart';
 import 'settings/settings_screen.dart';
+import '../services/connectivity_service.dart';
+import 'dart:async';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -21,10 +23,56 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _isAdmin = false;
   bool _isLoadingRole = true;
 
+  final _connectivityService = ConnectivityService();
+  StreamSubscription<bool>? _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     _loadUserRole();
+    _checkInitialConnection();
+    _connectivitySubscription = _connectivityService.onConnectivityChanged
+        .listen(_handleConnectivityChange);
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkInitialConnection() async {
+    final connected = await _connectivityService.hasConnection();
+    _handleConnectivityChange(connected);
+  }
+
+  void _handleConnectivityChange(bool connected) {
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentMaterialBanner();
+
+    if (!connected) {
+      messenger.showMaterialBanner(
+        MaterialBanner(
+          backgroundColor: Colors.red,
+          content: const Text(
+            'No internet connection. Please turn on WiFi or mobile data.',
+            style: TextStyle(color: Colors.white),
+          ),
+          leading: const Icon(Icons.wifi_off, color: Colors.white),
+          actions: [
+            TextButton(
+              onPressed: () => messenger.hideCurrentMaterialBanner(),
+              child: const Text(
+                'DISMISS',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _loadUserRole() async {

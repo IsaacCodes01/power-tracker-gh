@@ -62,6 +62,16 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
   }
 
   Future<void> _handleSubmit() async {
+    final currentUser = _authService.currentUser;
+    if (currentUser == null) {
+      AppSnackbar.show(
+        context,
+        message: 'Please log in to submit a report.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedAreaName == null ||
@@ -75,25 +85,17 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final currentUser = _authService.currentUser;
-
     final newReport = OutageReport(
       id: '',
-      reporterId: currentUser?.uid ?? '',
+      reporterId: currentUser.uid,
       area: _selectedAreaName!,
-      confirmedByUserIds: currentUser != null ? [currentUser.uid] : [],
+      confirmedByUserIds: [currentUser.uid],
       latitude: _selectedLatitude!,
       longitude: _selectedLongitude!,
       startTime: DateTime(
-        DateTime
-            .now()
-            .year,
-        DateTime
-            .now()
-            .month,
-        DateTime
-            .now()
-            .day,
+        DateTime.now().year,
+        DateTime.now().month,
+        DateTime.now().day,
         _selectedTime.hour,
         _selectedTime.minute,
       ),
@@ -120,7 +122,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-              (route) => false,
+          (route) => false,
         );
       }
     } catch (e) {
@@ -230,9 +232,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     alignLabelWithHint: true,
                   ),
                   validator: (value) {
-                    if (value == null || value
-                        .trim()
-                        .isEmpty) {
+                    if (value == null || value.trim().isEmpty) {
                       return 'Please add a short description';
                     }
                     return null;
@@ -273,10 +273,10 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     onPressed: _isSubmitting ? null : _handleSubmit,
                     child: _isSubmitting
                         ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text('Submit Report'),
                   ),
                 ),

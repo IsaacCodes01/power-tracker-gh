@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Required for inputFormatters
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../services/connectivity_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -71,16 +72,30 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  final _connectivityService = ConnectivityService();
+
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // 1. FIXED: Pre-capture your UI states before the async operations run!
+    final navigator = Navigator.of(context);
+
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
-    // 1. FIXED: Pre-capture your UI states before the async operations run!
-    final navigator = Navigator.of(context);
 
     try {
       // 2. FIXED: Pull the full formatted value out of your country flag selection model

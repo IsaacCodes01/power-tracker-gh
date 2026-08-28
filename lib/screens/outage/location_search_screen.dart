@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../services/location_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../widgets/app_snackbar.dart';
 
 class LocationSearchScreen extends StatefulWidget {
   const LocationSearchScreen({super.key});
@@ -21,9 +23,23 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
     super.dispose();
   }
 
+  final _connectivityService = ConnectivityService();
+
   Future<void> _search(String query) async {
     if (query.trim().length < 3) {
       setState(() => _results = []);
+      return;
+    }
+
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
       return;
     }
 

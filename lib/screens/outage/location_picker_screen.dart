@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../services/location_service.dart';
 import 'location_search_screen.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../services/connectivity_service.dart';
 
 enum LocationChoice { current, different }
 
@@ -25,7 +26,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   double? _resultLon;
   String? _resultName;
 
+  final _connectivityService = ConnectivityService();
+
   Future<void> _useCurrentLocation() async {
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
     setState(() {
       _selectedChoice = LocationChoice.current;
       _isLoadingCurrent = true;

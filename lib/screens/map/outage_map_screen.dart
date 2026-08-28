@@ -5,6 +5,8 @@ import '../../services/firestore_service.dart';
 import '../../services/location_service.dart';
 import '../../models/outage_report.dart';
 import '../outage/outage_detail_screen.dart';
+import '../../services/connectivity_service.dart';
+import '../../widgets/app_snackbar.dart';
 
 class OutageMapScreen extends StatefulWidget {
   final double? focusLatitude;
@@ -43,9 +45,23 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
     }
   }
 
+  final _connectivityService = ConnectivityService();
+
   Future<void> _handleSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isSearching = true;

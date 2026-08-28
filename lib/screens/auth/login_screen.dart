@@ -4,6 +4,8 @@ import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../services/connectivity_service.dart';
+import '../main_navigation_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,9 +31,23 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  final _connectivityService = ConnectivityService();
+
   Future<void> _handleLogin() async {
     // Only proceed if the form's validators (email format, non-empty) pass.
     if (!_formKey.currentState!.validate()) return;
+
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -52,6 +68,10 @@ class _LoginScreenState extends State<LoginScreen> {
           context,
           message: 'Login successful',
           type: AppMessageType.success,
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
         );
       }
     } catch (e) {

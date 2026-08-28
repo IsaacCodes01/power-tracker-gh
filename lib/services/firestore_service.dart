@@ -70,6 +70,7 @@ class FirestoreService {
   Stream<List<OutageReport>> streamReports() {
     return _reportsRef
         .orderBy('createdAt', descending: true)
+        .limit(100)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
