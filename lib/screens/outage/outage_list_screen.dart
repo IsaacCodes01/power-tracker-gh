@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
+import '../../models/app_user.dart';
 import '../../widgets/outage_card.dart';
 import '../../widgets/notification_bell.dart';
+import '../../widgets/app_snackbar.dart';
+import 'location_picker_screen.dart';
 
 enum ReportFilter { all, mine, restored, noLight, confirmed, yourLocation }
 
@@ -22,10 +25,61 @@ class _OutageListScreenState extends State<OutageListScreen> {
   ReportFilter _selectedFilter = ReportFilter.all;
   String _searchQuery = '';
 
+  AppUser? _userProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      final profile = await _firestoreService.getUserProfile(uid);
+      if (mounted) setState(() => _userProfile = profile);
+    }
+  }
+
+  // Called when the "Your Location" chip is tapped.
+  Future<void> _handleYourLocationTap() async {
+    // If a default location isn't set yet, send them to the picker first.
+    if (_userProfile == null || !_userProfile!.hasDefaultLocation) {
+      final result = await Navigator.push<Map<String, dynamic>>(
+        context,
+        MaterialPageRoute(builder: (_) => const LocationPickerScreen()),
+      );
+
+      if (result == null) return;
+
+      final uid = _authService.currentUser?.uid;
+      if (uid == null) return;
+
+      await _firestoreService.saveDefaultLocation(
+        uid,
+        result['latitude'],
+        result['longitude'],
+        result['name'],
+      );
+
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'Default location set: ${result['name']}',
+          type: AppMessageType.success,
+        );
+      }
+
+      await _loadUserProfile();
+    }
+
+    setState(() => _selectedFilter = ReportFilter.yourLocation);
   }
 
   List<OutageReport> _applyFilters(List<OutageReport> reports) {
@@ -50,7 +104,17 @@ class _OutageListScreenState extends State<OutageListScreen> {
         result = result.where((r) => r.confirmedByUserIds.isNotEmpty).toList();
         break;
       case ReportFilter.yourLocation:
-        result = [];
+        final defaultName = _userProfile?.defaultLocationName;
+        if (defaultName == null || defaultName.isEmpty) {
+          result = [];
+        } else {
+          // Match against just the first segment of the saved name,
+          // e.g. "Madina" from "Madina, Accra", same idea as search.
+          final keyword = defaultName.split(',').first.trim().toLowerCase();
+          result = result
+              .where((r) => r.area.toLowerCase().contains(keyword))
+              .toList();
+        }
         break;
       case ReportFilter.all:
         break;
@@ -60,7 +124,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
       result = result
           .where(
             (r) => r.area.toLowerCase().contains(_searchQuery.toLowerCase()),
-      )
+          )
           .toList();
     }
 
@@ -83,9 +147,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // SEARCH BAR — now lives outside the StreamBuilder, so it
-            // never rebuilds just because Firestore emits new data.
-            // This is what keeps the keyboard focus stable while typing.
             TextField(
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
@@ -102,8 +163,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
             ),
             const SizedBox(height: 12),
 
-            // FILTER CHIPS — same reasoning, built once, not rebuilt
-            // by Firestore's stream emissions.
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -122,10 +181,8 @@ class _OutageListScreenState extends State<OutageListScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Everything below this point genuinely needs live data,
-            // so it's the only part still wrapped in StreamBuilder.
             Expanded(
               child: StreamBuilder<List<OutageReport>>(
                 stream: _firestoreService.streamReports(),
@@ -144,8 +201,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
                   final resolvedCount = allReports.where((r) {
                     if (r.status != OutageStatus.restored) return false;
                     if (r.endTime == null) return false;
-                    final hoursSinceResolved = DateTime
-                        .now()
+                    final hoursSinceResolved = DateTime.now()
                         .difference(r.endTime!)
                         .inHours;
                     return hoursSinceResolved < 24;
@@ -155,14 +211,6 @@ class _OutageListScreenState extends State<OutageListScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Overview',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -173,7 +221,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
                               color: Colors.redAccent,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: _buildOverviewCard(
                               title: 'Past 24H Resolved',
@@ -184,7 +232,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
 
                       Text(
                         'Recent Reports (${filteredReports.length})',
@@ -193,23 +241,23 @@ class _OutageListScreenState extends State<OutageListScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
 
                       Expanded(
                         child: filteredReports.isEmpty
                             ? const Center(
-                          child: Text(
-                            'No reports found.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        )
+                                child: Text(
+                                  'No reports found.',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              )
                             : ListView.builder(
-                          itemCount: filteredReports.length,
-                          itemBuilder: (context, index) {
-                            final report = filteredReports[index];
-                            return OutageCard(report: report);
-                          },
-                        ),
+                                itemCount: filteredReports.length,
+                                itemBuilder: (context, index) {
+                                  final report = filteredReports[index];
+                                  return OutageCard(report: report);
+                                },
+                              ),
                       ),
                     ],
                   );
@@ -224,38 +272,22 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
   Widget _buildFilterChip(String label, ReportFilter filter) {
     final isSelected = _selectedFilter == filter;
-    final isComingSoon = filter == ReportFilter.yourLocation;
+    final isYourLocation = filter == ReportFilter.yourLocation;
 
     return ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          if (isComingSoon) ...[
-            const SizedBox(width: 4),
-            const Icon(Icons.lock_clock, size: 14),
-          ],
-        ],
-      ),
+      label: Text(label),
       selected: isSelected,
       onSelected: (_) {
-        if (isComingSoon) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location filtering is coming soon!'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+        if (isYourLocation) {
+          _handleYourLocationTap();
           return;
         }
         setState(() => _selectedFilter = filter);
       },
       selectedColor: Colors.deepPurple[100],
-      backgroundColor: isComingSoon ? Colors.grey[200] : Colors.white,
+      backgroundColor: Colors.white,
       labelStyle: TextStyle(
-        color: isComingSoon
-            ? Colors.grey
-            : (isSelected ? Colors.deepPurple : Colors.black87),
+        color: isSelected ? Colors.deepPurple : Colors.black87,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
@@ -268,35 +300,41 @@ class _OutageListScreenState extends State<OutageListScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withAlpha(20),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Icon(icon, color: color, size: 30),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: color.withAlpha(30),
+            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                title,
+                style: TextStyle(color: Colors.grey[600], fontSize: 11),
+              ),
+            ],
           ),
         ],
       ),
