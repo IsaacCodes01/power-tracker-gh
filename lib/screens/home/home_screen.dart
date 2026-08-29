@@ -3,6 +3,7 @@ import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/outage_card.dart';
 import '../../widgets/notification_bell.dart';
+import '../../widgets/admin_mode_toggle.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onNavigateToReport;
@@ -21,11 +22,34 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('Home'),
         backgroundColor: Colors.deepPurple,
         elevation: 0,
         foregroundColor: Colors.white,
-        actions: const [NotificationBell()],
+        automaticallyImplyLeading: false,
+        title: null,
+        flexibleSpace: SafeArea(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Positioned(
+                left: 16,
+                child: Text(
+                  'Home',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const Align(
+                alignment: Alignment.center,
+                child: AdminModeToggle(),
+              ),
+              const Positioned(right: 8, child: NotificationBell()),
+            ],
+          ),
+        ),
       ),
       body: StreamBuilder<List<OutageReport>>(
         stream: firestoreService.streamReports(),
@@ -46,8 +70,7 @@ class HomeScreen extends StatelessWidget {
           final resolvedLast24hCount = reports.where((r) {
             if (r.status != OutageStatus.restored) return false;
             if (r.endTime == null) return false;
-            final hoursSinceResolved = DateTime
-                .now()
+            final hoursSinceResolved = DateTime.now()
                 .difference(r.endTime!)
                 .inHours;
             return hoursSinceResolved < 24;
@@ -204,7 +227,11 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 30),
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withAlpha(37),
+            child: Icon(icon, color: color, size: 18),
+          ),
           const SizedBox(height: 12),
           Text(
             value,

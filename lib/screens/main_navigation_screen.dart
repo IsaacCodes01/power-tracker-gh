@@ -119,11 +119,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         icon: Icon(Icons.flash_off),
         label: 'Outages',
       ),
-      if (_isAdmin)
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.admin_panel_settings),
-          label: 'Admin',
-        ),
       const BottomNavigationBarItem(
         icon: Icon(Icons.settings),
         label: 'Settings',

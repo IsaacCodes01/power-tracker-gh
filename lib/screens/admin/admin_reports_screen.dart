@@ -1,0 +1,229 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/firestore_service.dart';
+import '../../models/outage_report.dart';
+
+class AdminReportsScreen extends StatelessWidget {
+  const AdminReportsScreen({super.key});
+
+  Color _statusColor(OutageStatus status) {
+    switch (status) {
+      case OutageStatus.restored:
+        return Colors.green;
+      case OutageStatus.reported:
+        return Colors.redAccent;
+      case OutageStatus.investigating:
+        return Colors.orange;
+      case OutageStatus.repairing:
+        return Colors.blue;
+    }
+  }
+
+  String _statusLabel(OutageStatus status) {
+    switch (status) {
+      case OutageStatus.restored:
+        return 'Resolved';
+      case OutageStatus.reported:
+        return 'Reported';
+      case OutageStatus.investigating:
+        return 'Investigating';
+      case OutageStatus.repairing:
+        return 'Fixing';
+    }
+  }
+
+  // Returns the next status in the real-world progression, or null
+  // if the report is already fully restored.
+  OutageStatus? _nextStatus(OutageStatus current) {
+    switch (current) {
+      case OutageStatus.reported:
+        return OutageStatus.investigating;
+      case OutageStatus.investigating:
+        return OutageStatus.repairing;
+      case OutageStatus.repairing:
+        return OutageStatus.restored;
+      case OutageStatus.restored:
+        return null;
+    }
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    FirestoreService service,
+    OutageReport report,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Report?'),
+        content: Text(
+          'This will permanently delete the report for "${report.area}". This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await service.deleteReport(report.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final firestoreService = FirestoreService();
+
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: StreamBuilder<List<OutageReport>>(
+        stream: firestoreService.streamReports(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          final reports = snapshot.data ?? [];
+
+          if (reports.isEmpty) {
+            return const Center(child: Text('No reports to manage.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: reports.length,
+            itemBuilder: (context, index) {
+              final report = reports[index];
+              final next = _nextStatus(report.status);
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              report.area,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _statusColor(report.status).withAlpha(30),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              _statusLabel(report.status),
+                              style: TextStyle(
+                                color: _statusColor(report.status),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        report.description,
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Confirmed by ${report.confirmedByUserIds.length} user(s)',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // STATUS PROGRESSION
+                      if (next != null)
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.arrow_forward, size: 16),
+                            label: Text('Move to "${_statusLabel(next)}"'),
+                            onPressed: () async {
+                              await firestoreService.updateReport(report.id, {
+                                'status': next.name,
+                                if (next == OutageStatus.restored)
+                                  'endTime': Timestamp.now(),
+                              });
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: report.verified
+                                  ? null
+                                  : () => firestoreService.verifyReport(
+                                      report.id,
+                                    ),
+                              icon: Icon(
+                                report.verified
+                                    ? Icons.verified
+                                    : Icons.check_circle_outline,
+                                color: report.verified
+                                    ? Colors.green
+                                    : Colors.grey,
+                              ),
+                              label: Text(
+                                report.verified ? 'Verified' : 'Verify',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () => _confirmDelete(
+                              context,
+                              firestoreService,
+                              report,
+                            ),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
+                            tooltip: 'Delete report',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

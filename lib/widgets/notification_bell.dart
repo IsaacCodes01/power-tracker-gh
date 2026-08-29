@@ -20,11 +20,13 @@ class NotificationBell extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined),
+              color: Colors.white,
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => const NotificationsListScreen()),
+                    builder: (_) => const NotificationsListScreen(),
+                  ),
                 );
               },
             ),
@@ -39,13 +41,16 @@ class NotificationBell extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   constraints: const BoxConstraints(
-                      minWidth: 16, minHeight: 16),
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
                   child: Text(
                     count > 9 ? '9+' : '$count',
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
