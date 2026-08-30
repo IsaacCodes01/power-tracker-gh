@@ -153,6 +153,29 @@ class FirestoreService {
     }
   }
 
+  // Fetches every registered user's ID, used for broadcasting an
+  // announcement to all users rather than a specific area.
+  Future<List<String>> getAllUserIds() async {
+    final snapshot = await _usersRef.get();
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
+  // Returns every distinct area name that has at least one report,
+  // used to populate the area picker in Send Announcements.
+  Future<List<String>> getDistinctAreas() async {
+    final snapshot = await _reportsRef.get();
+    final areas = snapshot.docs
+        .map(
+          (doc) =>
+              (doc.data() as Map<String, dynamic>)['area'] as String? ?? '',
+        )
+        .where((area) => area.isNotEmpty)
+        .toSet()
+        .toList();
+    areas.sort();
+    return areas;
+  }
+
   // UPDATE USER: Modifies targeted user data fields (like phone number) safely
   Future<void> updateUserProfile(
     String uid,

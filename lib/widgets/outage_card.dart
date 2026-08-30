@@ -35,6 +35,19 @@ class OutageCard extends StatelessWidget {
     }
   }
 
+  IconData outageTypeIcon(OutageType type) {
+    switch (type) {
+      case OutageType.powerOutage:
+        return Icons.power_off;
+      case OutageType.flickeringLights:
+        return Icons.lightbulb_outline;
+      case OutageType.voltageFluctuation:
+        return Icons.bolt;
+      case OutageType.poleFault:
+        return Icons.report_problem_outlined;
+    }
+  }
+
   String _timeAgo(DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
     if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
@@ -138,7 +151,9 @@ class OutageCard extends StatelessWidget {
                 Icon(Icons.people_outline, size: 16, color: Colors.pink[600]),
                 const SizedBox(width: 6),
                 Text(
-                  '$confirmedCount household${confirmedCount == 1 ? '' : 's'} affected',
+                  '$confirmedCount household${confirmedCount == 1
+                      ? ''
+                      : 's'} affected',
                   style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
                 const Spacer(),
@@ -159,7 +174,7 @@ class OutageCard extends StatelessWidget {
                         child: Stack(
                           children: List.generate(count, (i) {
                             final label =
-                                (initials != null && i < initials.length)
+                            (initials != null && i < initials.length)
                                 ? initials[i]
                                 : '?';
                             return Positioned(
@@ -197,10 +212,11 @@ class OutageCard extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => OutageMapScreen(
-                            focusLatitude: report.latitude,
-                            focusLongitude: report.longitude,
-                          ),
+                          builder: (_) =>
+                              OutageMapScreen(
+                                focusLatitude: report.latitude,
+                                focusLongitude: report.longitude,
+                              ),
                         ),
                       );
                     },

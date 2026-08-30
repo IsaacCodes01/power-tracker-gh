@@ -1,81 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
+import '../../widgets/admin_report_card.dart';
 
-class AdminReportsScreen extends StatelessWidget {
+
+class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
 
-  Color _statusColor(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return Colors.green;
-      case OutageStatus.reported:
-        return Colors.redAccent;
-      case OutageStatus.investigating:
-        return Colors.orange;
-      case OutageStatus.repairing:
-        return Colors.blue;
-    }
-  }
+  @override
+  State<AdminReportsScreen> createState() => _AdminReportsScreenState();
+}
 
-  String _statusLabel(OutageStatus status) {
-    switch (status) {
-      case OutageStatus.restored:
-        return 'Resolved';
-      case OutageStatus.reported:
-        return 'Reported';
-      case OutageStatus.investigating:
-        return 'Investigating';
-      case OutageStatus.repairing:
-        return 'Fixing';
-    }
-  }
 
-  // Returns the next status in the real-world progression, or null
-  // if the report is already fully restored.
-  OutageStatus? _nextStatus(OutageStatus current) {
-    switch (current) {
-      case OutageStatus.reported:
-        return OutageStatus.investigating;
-      case OutageStatus.investigating:
-        return OutageStatus.repairing;
-      case OutageStatus.repairing:
-        return OutageStatus.restored;
-      case OutageStatus.restored:
-        return null;
-    }
+IconData outageTypeIcon(OutageType type) {
+  switch (type) {
+    case OutageType.powerOutage:
+      return Icons.power_off;
+    case OutageType.flickeringLights:
+      return Icons.lightbulb_outline;
+    case OutageType.voltageFluctuation:
+      return Icons.bolt;
+    case OutageType.poleFault:
+      return Icons.report_problem_outlined;
   }
+}
 
-  Future<void> _confirmDelete(
-    BuildContext context,
-    FirestoreService service,
-    OutageReport report,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Report?'),
-        content: Text(
-          'This will permanently delete the report for "${report.area}". This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
 
-    if (confirmed == true) {
-      await service.deleteReport(report.id);
-    }
-  }
+class _AdminReportsScreenState extends State<AdminReportsScreen> {
+  OutageType? _selectedType; // null means "All"
 
   @override
   Widget build(BuildContext context) {
@@ -95,134 +47,160 @@ class AdminReportsScreen extends StatelessWidget {
 
           final reports = snapshot.data ?? [];
 
-          if (reports.isEmpty) {
-            return const Center(child: Text('No reports to manage.'));
-          }
+          final filtered = _selectedType == null
+              ? reports
+              : reports.where((r) => r.outageType == _selectedType).toList();
 
-          return ListView.builder(
+          return Padding(
             padding: const EdgeInsets.all(16),
-            itemCount: reports.length,
-            itemBuilder: (context, index) {
-              final report = reports[index];
-              final next = _nextStatus(report.status);
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Overview',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 10),
+                _buildOverview(reports),
+                const SizedBox(height: 16),
+
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              report.area,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                      _filterChip('All', null, reports),
+                      const SizedBox(width: 8),
+                      ...OutageType.values.map(
+                            (type) =>
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _filterChip(
+                                outageTypeLabel(type),
+                                type,
+                                reports,
                               ),
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _statusColor(report.status).withAlpha(30),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _statusLabel(report.status),
-                              style: TextStyle(
-                                color: _statusColor(report.status),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        report.description,
-                        style: TextStyle(color: Colors.grey[700]),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Confirmed by ${report.confirmedByUserIds.length} user(s)',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // STATUS PROGRESSION
-                      if (next != null)
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.arrow_forward, size: 16),
-                            label: Text('Move to "${_statusLabel(next)}"'),
-                            onPressed: () async {
-                              await firestoreService.updateReport(report.id, {
-                                'status': next.name,
-                                if (next == OutageStatus.restored)
-                                  'endTime': Timestamp.now(),
-                              });
-                            },
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: report.verified
-                                  ? null
-                                  : () => firestoreService.verifyReport(
-                                      report.id,
-                                    ),
-                              icon: Icon(
-                                report.verified
-                                    ? Icons.verified
-                                    : Icons.check_circle_outline,
-                                color: report.verified
-                                    ? Colors.green
-                                    : Colors.grey,
-                              ),
-                              label: Text(
-                                report.verified ? 'Verified' : 'Verify',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () => _confirmDelete(
-                              context,
-                              firestoreService,
-                              report,
-                            ),
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            tooltip: 'Delete report',
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(child: Text('No reports found.'))
+                      : ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      return AdminReportCard(report: filtered[index]);
+                    },
+                  ),
+                ),
+              ],
+            ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildOverview(List<OutageReport> reports) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 2.2,
+      children: [
+        _overviewTile(
+          'Total Reports',
+          '${reports.length}',
+          Icons.list_alt,
+          Colors.deepPurple,
+        ),
+        ...OutageType.values.map((type) {
+          final count = reports
+              .where((r) => r.outageType == type)
+              .length;
+          return _overviewTile(
+            outageTypeLabel(type),
+            '$count',
+            outageTypeIcon(type),
+            Colors.blueGrey,
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _overviewTile(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withAlpha(20),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: color.withAlpha(30),
+            child: Icon(icon, color: color, size: 14),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  title,
+                  style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _filterChip(String label,
+      OutageType? type,
+      List<OutageReport> reports,) {
+    final isSelected = _selectedType == type;
+
+    // Count of NOT-resolved reports matching this filter.
+    final count = reports.where((r) {
+      final matchesType = type == null || r.outageType == type;
+      return matchesType && r.status != OutageStatus.restored;
+    }).length;
+
+    return ChoiceChip(
+      label: Text('$label ($count)'),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _selectedType = type),
+      selectedColor: Colors.deepPurple[100],
+      backgroundColor: Colors.white,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.deepPurple : Colors.black87,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
   }
