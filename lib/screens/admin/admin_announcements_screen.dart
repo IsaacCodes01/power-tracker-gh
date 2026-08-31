@@ -193,15 +193,15 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                 groupValue: _sendToAll,
                 onChanged: (value) => setState(() => _sendToAll = value!),
                 child: Column(
-                  children: const [
+                  children: [
                     RadioListTile<bool>(
                       value: true,
-                      activeColor: Colors.deepPurple,
+                      activeColor: Colors.deepPurple[900],
                       title: Text('Send to all users'),
                     ),
                     RadioListTile<bool>(
                       value: false,
-                      activeColor: Colors.deepPurple,
+                      activeColor: Colors.deepPurple[900],
                       title: Text('Send to specific area(s)'),
                     ),
                   ],
@@ -270,7 +270,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                 child: ElevatedButton(
                   onPressed: _isSending ? null : _handleSend,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.deepPurple[900],
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),

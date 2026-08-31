@@ -49,6 +49,10 @@ class FirestoreService {
         );
   }
 
+  Stream<int> streamUserCount() {
+    return _usersRef.snapshots().map((snapshot) => snapshot.docs.length);
+  }
+
   // Live count of unread notifications, used for the red badge.
   Stream<int> streamUnreadCount(String userId) {
     return _notificationsRef

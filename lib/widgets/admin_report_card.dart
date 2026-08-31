@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/outage_report.dart';
 import '../screens/admin/admin_report_detail_screen.dart';
 
-
 class AdminReportCard extends StatelessWidget {
   final OutageReport report;
 
@@ -31,6 +30,19 @@ class AdminReportCard extends StatelessWidget {
         return Icons.bolt;
       case OutageType.poleFault:
         return Icons.report_problem_outlined;
+    }
+  }
+
+  Color outageTypeColor(OutageType type) {
+    switch (type) {
+      case OutageType.powerOutage:
+        return Colors.redAccent;
+      case OutageType.flickeringLights:
+        return Colors.amber[800]!;
+      case OutageType.voltageFluctuation:
+        return Colors.blue;
+      case OutageType.poleFault:
+        return Colors.deepOrange;
     }
   }
 

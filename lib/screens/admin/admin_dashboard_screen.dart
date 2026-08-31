@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
+import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
-  const AdminDashboardScreen({super.key});
+  final VoidCallback onNavigateToReports;
+
+  const AdminDashboardScreen({super.key, required this.onNavigateToReports});
 
   @override
   Widget build(BuildContext context) {
     final firestoreService = FirestoreService();
+    final email = AuthService().currentUser?.email ?? 'Admin';
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -39,6 +43,19 @@ class AdminDashboardScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
+                  'Welcome back',
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+                Text(
+                  email,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                const Text(
                   'Overview',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
@@ -62,6 +79,7 @@ class AdminDashboardScreen extends StatelessWidget {
                       value: '$activeCount',
                       icon: Icons.flash_off,
                       color: Colors.redAccent,
+                      onTap: onNavigateToReports,
                     ),
                     _statCard(
                       title: 'Past 24H Resolved',
@@ -74,6 +92,18 @@ class AdminDashboardScreen extends StatelessWidget {
                       value: '$unverifiedCount',
                       icon: Icons.verified_outlined,
                       color: Colors.orange,
+                      onTap: onNavigateToReports,
+                    ),
+                    StreamBuilder<int>(
+                      stream: firestoreService.streamUserCount(),
+                      builder: (context, userSnapshot) {
+                        return _statCard(
+                          title: 'Total Users',
+                          value: '${userSnapshot.data ?? '—'}',
+                          icon: Icons.people_outline,
+                          color: Colors.blue,
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -90,35 +120,54 @@ class AdminDashboardScreen extends StatelessWidget {
     required String value,
     required IconData icon,
     required Color color,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withAlpha(20),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: color.withAlpha(30),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-        ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withAlpha(20),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: color.withAlpha(30),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                if (onTap != null)
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 12,
+                    color: Colors.grey[400],
+                  ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              title,
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }

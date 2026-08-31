@@ -13,21 +13,28 @@ class AdminShellScreen extends StatefulWidget {
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _currentIndex = 0;
 
-  final _screens = const [
-    AdminDashboardScreen(),
-    AdminReportsScreen(),
-    AdminAnnouncementsScreen(),
-  ];
-
   final _titles = const ['Dashboard', 'Reports', 'Send Announcements'];
 
   @override
   Widget build(BuildContext context) {
+    final screens = [
+      AdminDashboardScreen(
+        onNavigateToReports: () => setState(() => _currentIndex = 1),
+      ),
+      const AdminReportsScreen(),
+      const AdminAnnouncementsScreen(),
+    ];
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: _currentIndex != 0,
+        automaticallyImplyLeading: false,
+        leading: _currentIndex != 0
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _currentIndex = 0),
+              )
+            : null,
         title: Text(_titles[_currentIndex]),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.deepPurple[900],
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -45,10 +52,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
+                  child: Text(
                     'User',
                     style: TextStyle(
-                      color: Colors.deepPurple,
+                      color: Colors.deepPurple[900],
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -60,14 +67,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       ),
       body: Stack(
         children: [
-          _screens[_currentIndex],
+          screens[_currentIndex],
 
           // FLOATING HAMBURGER — sits on the screen itself, not the app bar.
           Positioned(
             bottom: 20,
             right: 20,
             child: FloatingActionButton(
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: Colors.deepPurple[900],
               onPressed: () => _showAdminMenu(context),
               child: const Icon(Icons.menu, color: Colors.white),
             ),
@@ -104,13 +111,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? Colors.deepPurple : Colors.grey[700],
+        color: isSelected ? Colors.deepPurple[900] : Colors.grey[700],
       ),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.deepPurple : Colors.black87,
+          color: isSelected ? Colors.deepPurple[900] : Colors.black87,
         ),
       ),
       onTap: () {

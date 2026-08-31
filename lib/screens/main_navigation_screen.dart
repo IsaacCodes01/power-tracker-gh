@@ -105,7 +105,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const ReportOutageScreen(),
       const OutageListScreen(),
       const SettingsScreen(),
-      if (_isAdmin) const AdminDashboardScreen(),
+      if (_isAdmin)
+        AdminDashboardScreen(
+          onNavigateToReports: () => setState(() => _currentIndex = 3),
+        ),
     ];
 
     final navItems = [

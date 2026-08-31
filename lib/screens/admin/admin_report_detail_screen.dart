@@ -70,9 +70,11 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
     });
 
     if (mounted) {
-      AppSnackbar.show(context,
-          message: 'Status updated to ${_statusLabel(newStatus)}',
-          type: AppMessageType.success);
+      AppSnackbar.show(
+        context,
+        message: 'Status updated to ${_statusLabel(newStatus)}',
+        type: AppMessageType.success,
+      );
     }
   }
 
@@ -101,32 +103,33 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
       _isUpdating = false;
     });
     if (mounted) {
-      AppSnackbar.show(context,
-          message: 'Report verified', type: AppMessageType.success);
+      AppSnackbar.show(
+        context,
+        message: 'Report verified',
+        type: AppMessageType.success,
+      );
     }
   }
 
   Future<void> _confirmDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: const Text('Delete Report?'),
-            content: Text(
-                'This will permanently delete the report for "${_report
-                    .area}". This cannot be undone.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                    'Delete', style: TextStyle(color: Colors.red)),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Report?'),
+        content: Text(
+          'This will permanently delete the report for "${_report.area}". This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true) {
@@ -141,7 +144,7 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(_report.area),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.deepPurple[900],
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -160,8 +163,10 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Outage Type: ${outageTypeLabel(_report.outageType)}',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    'Outage Type: ${outageTypeLabel(_report.outageType)}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 4),
                   Text('Severity: ${_report.severity.name}'),
                   const SizedBox(height: 8),
@@ -190,8 +195,8 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
               onChanged: _isUpdating
                   ? null
                   : (value) {
-                if (value != null) _changeStatus(value);
-              },
+                      if (value != null) _changeStatus(value);
+                    },
             ),
             const SizedBox(height: 20),
 
@@ -202,8 +207,9 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
                     ? null
                     : _toggleVerify,
                 icon: Icon(
-                  _report.verified ? Icons.verified : Icons
-                      .check_circle_outline,
+                  _report.verified
+                      ? Icons.verified
+                      : Icons.check_circle_outline,
                   color: _report.verified ? Colors.green : Colors.grey,
                 ),
                 label: Text(_report.verified ? 'Verified' : 'Verify Report'),
@@ -216,9 +222,11 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  AppSnackbar.show(context,
-                      message: 'Send Response — coming soon',
-                      type: AppMessageType.info);
+                  AppSnackbar.show(
+                    context,
+                    message: 'Send Response — coming soon',
+                    type: AppMessageType.info,
+                  );
                 },
                 icon: const Icon(Icons.reply),
                 label: const Text('Send Response'),

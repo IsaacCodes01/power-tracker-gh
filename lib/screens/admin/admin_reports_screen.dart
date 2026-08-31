@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/admin_report_card.dart';
-
+import '../../services/firestore_service.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -10,7 +9,6 @@ class AdminReportsScreen extends StatefulWidget {
   @override
   State<AdminReportsScreen> createState() => _AdminReportsScreenState();
 }
-
 
 IconData outageTypeIcon(OutageType type) {
   switch (type) {
@@ -25,18 +23,35 @@ IconData outageTypeIcon(OutageType type) {
   }
 }
 
+Color outageTypeColor(OutageType type) {
+  switch (type) {
+    case OutageType.powerOutage:
+      return Colors.redAccent;
+    case OutageType.flickeringLights:
+      return Colors.amber[800]!;
+    case OutageType.voltageFluctuation:
+      return Colors.blue;
+    case OutageType.poleFault:
+      return Colors.deepOrange;
+  }
+}
 
 class _AdminReportsScreenState extends State<AdminReportsScreen> {
   OutageType? _selectedType; // null means "All"
+  late final Stream<List<OutageReport>> _reportsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsStream = FirestoreService().streamReports();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final firestoreService = FirestoreService();
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: StreamBuilder<List<OutageReport>>(
-        stream: firestoreService.streamReports(),
+        stream: _reportsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -65,21 +80,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 const SizedBox(height: 16),
 
                 SingleChildScrollView(
+                  key: const PageStorageKey('admin_type_filter_chips'),
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
                       _filterChip('All', null, reports),
                       const SizedBox(width: 8),
                       ...OutageType.values.map(
-                            (type) =>
-                            Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: _filterChip(
-                                outageTypeLabel(type),
-                                type,
-                                reports,
-                              ),
-                            ),
+                        (type) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _filterChip(
+                            outageTypeLabel(type),
+                            type,
+                            reports,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -90,11 +105,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   child: filtered.isEmpty
                       ? const Center(child: Text('No reports found.'))
                       : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      return AdminReportCard(report: filtered[index]);
-                    },
-                  ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            return AdminReportCard(report: filtered[index]);
+                          },
+                        ),
                 ),
               ],
             ),
@@ -120,14 +135,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           Colors.deepPurple,
         ),
         ...OutageType.values.map((type) {
-          final count = reports
-              .where((r) => r.outageType == type)
-              .length;
+          final count = reports.where((r) => r.outageType == type).length;
           return _overviewTile(
             outageTypeLabel(type),
             '$count',
             outageTypeIcon(type),
-            Colors.blueGrey,
+            outageTypeColor(type),
           );
         }),
       ],
@@ -181,9 +194,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     );
   }
 
-  Widget _filterChip(String label,
-      OutageType? type,
-      List<OutageReport> reports,) {
+  Widget _filterChip(
+    String label,
+    OutageType? type,
+    List<OutageReport> reports,
+  ) {
     final isSelected = _selectedType == type;
 
     // Count of NOT-resolved reports matching this filter.
