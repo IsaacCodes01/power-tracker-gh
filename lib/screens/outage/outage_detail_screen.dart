@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../models/notification_item.dart';
 
 class OutageDetailScreen extends StatefulWidget {
   final OutageReport report;
@@ -132,6 +133,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
       if (uid == _authService.currentUser?.uid) continue;
       await _firestoreService.createNotification(
         userId: uid,
+        type: NotificationType.powerRestored,
         title: 'Power Restored',
         message: '${_report.area} has been marked as restored.',
         relatedReportId: _report.id,

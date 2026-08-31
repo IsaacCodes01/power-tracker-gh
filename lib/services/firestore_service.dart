@@ -17,12 +17,14 @@ class FirestoreService {
   // Writes a new notification for a specific user.
   Future<void> createNotification({
     required String userId,
+    required NotificationType type,
     required String title,
     required String message,
     String? relatedReportId,
   }) async {
     await _notificationsRef.add({
       'userId': userId,
+      'type': type.name,
       'title': title,
       'message': message,
       'read': false,

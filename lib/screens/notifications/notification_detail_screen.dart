@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/notification_item.dart';
+import '../../widgets/notification_style.dart';
 
 class NotificationDetailScreen extends StatelessWidget {
   final NotificationItem notification;
@@ -22,9 +23,14 @@ class NotificationDetailScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 10),
             CircleAvatar(
-              radius: 32,
-              backgroundColor: Colors.deepPurple[100],
-              child: const Icon(Icons.bolt, color: Colors.deepPurple, size: 30),
+              radius: 20,
+              backgroundColor: notificationTypeColor(
+                notification.type,
+              ).withAlpha(30),
+              child: Icon(
+                notificationTypeIcon(notification.type),
+                color: notificationTypeColor(notification.type),
+              ),
             ),
             const SizedBox(height: 16),
             Text(

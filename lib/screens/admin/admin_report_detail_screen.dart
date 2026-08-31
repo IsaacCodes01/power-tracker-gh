@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../models/notification_item.dart';
 
 class AdminReportDetailScreen extends StatefulWidget {
   final OutageReport report;
@@ -39,75 +40,104 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
   }
 
   Future<void> _changeStatus(OutageStatus newStatus) async {
+    if (_report.status == newStatus) return;
     setState(() => _isUpdating = true);
 
-    await _firestoreService.updateReport(_report.id, {
-      'status': newStatus.name,
-      if (newStatus == OutageStatus.restored) 'endTime': Timestamp.now(),
-    });
+    try {
+      await _firestoreService.updateReport(_report.id, {
+        'status': newStatus.name,
+        if (newStatus == OutageStatus.restored) 'endTime': Timestamp.now(),
+      });
 
-    setState(() {
-      _report = OutageReport(
-        id: _report.id,
-        reporterId: _report.reporterId,
-        area: _report.area,
-        latitude: _report.latitude,
-        longitude: _report.longitude,
-        startTime: _report.startTime,
-        endTime: newStatus == OutageStatus.restored
-            ? DateTime.now()
-            : _report.endTime,
-        status: newStatus,
-        severity: _report.severity,
-        outageType: _report.outageType,
-        estimatedRestoration: _report.estimatedRestoration,
-        description: _report.description,
-        confirmedByUserIds: _report.confirmedByUserIds,
-        verified: _report.verified,
-        createdAt: _report.createdAt,
-      );
-      _isUpdating = false;
-    });
+      // Correct type based on status
+      final isRestored = newStatus == OutageStatus.restored;
 
-    if (mounted) {
-      AppSnackbar.show(
-        context,
-        message: 'Status updated to ${_statusLabel(newStatus)}',
-        type: AppMessageType.success,
+      await _firestoreService.createNotification(
+        userId: _report.reporterId,
+        type: isRestored
+            ? NotificationType.powerRestored
+            : NotificationType.statusUpdate,
+        title: isRestored ? 'Power Restored' : 'Status Update',
+        message: isRestored
+            ? 'Good news! Power for ${_report.area} has been restored.'
+            : 'Your report for ${_report.area} is now ${_statusLabel(newStatus)}.',
+        relatedReportId: _report.id,
       );
+
+      setState(() {
+        _report = OutageReport(
+          id: _report.id,
+          reporterId: _report.reporterId,
+          area: _report.area,
+          latitude: _report.latitude,
+          longitude: _report.longitude,
+          startTime: _report.startTime,
+          endTime: isRestored ? DateTime.now() : _report.endTime,
+          status: newStatus,
+          severity: _report.severity,
+          outageType: _report.outageType,
+          estimatedRestoration: _report.estimatedRestoration,
+          description: _report.description,
+          confirmedByUserIds: _report.confirmedByUserIds,
+          verified: _report.verified,
+          createdAt: _report.createdAt,
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+        AppSnackbar.show(
+          context,
+          message: 'Status updated to ${_statusLabel(newStatus)}',
+          type: AppMessageType.success,
+        );
+      }
     }
   }
 
   Future<void> _toggleVerify() async {
     if (_report.verified) return;
     setState(() => _isUpdating = true);
-    await _firestoreService.verifyReport(_report.id);
-    setState(() {
-      _report = OutageReport(
-        id: _report.id,
-        reporterId: _report.reporterId,
-        area: _report.area,
-        latitude: _report.latitude,
-        longitude: _report.longitude,
-        startTime: _report.startTime,
-        endTime: _report.endTime,
-        status: _report.status,
-        severity: _report.severity,
-        outageType: _report.outageType,
-        estimatedRestoration: _report.estimatedRestoration,
-        description: _report.description,
-        confirmedByUserIds: _report.confirmedByUserIds,
-        verified: true,
-        createdAt: _report.createdAt,
+
+    try {
+      await _firestoreService.verifyReport(_report.id);
+
+      await _firestoreService.createNotification(
+        userId: _report.reporterId,
+        type: NotificationType.reportVerified,
+        title: 'Report Verified',
+        message: 'Your report for ${_report.area} has been verified.',
+        relatedReportId: _report.id,
       );
-      _isUpdating = false;
-    });
-    if (mounted) {
-      AppSnackbar.show(
-        context,
-        message: 'Report verified',
-        type: AppMessageType.success,
-      );
+
+      setState(() {
+        _report = OutageReport(
+          id: _report.id,
+          reporterId: _report.reporterId,
+          area: _report.area,
+          latitude: _report.latitude,
+          longitude: _report.longitude,
+          startTime: _report.startTime,
+          endTime: _report.endTime,
+          status: _report.status,
+          severity: _report.severity,
+          outageType: _report.outageType,
+          estimatedRestoration: _report.estimatedRestoration,
+          description: _report.description,
+          confirmedByUserIds: _report.confirmedByUserIds,
+          verified: true,
+          createdAt: _report.createdAt,
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdating = false);
+        AppSnackbar.show(
+          context,
+          message: 'Report verified',
+          type: AppMessageType.success,
+        );
+      }
     }
   }
 

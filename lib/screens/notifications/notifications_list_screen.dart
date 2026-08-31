@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/notification_item.dart';
+import '../../widgets/notification_style.dart';
 import 'notification_detail_screen.dart';
 
 class NotificationsListScreen extends StatelessWidget {
@@ -83,10 +84,12 @@ class NotificationsListScreen extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundColor: Colors.deepPurple[100],
-                          child: const Icon(
-                            Icons.bolt,
-                            color: Colors.deepPurple,
+                          backgroundColor: notificationTypeColor(
+                            notification.type,
+                          ).withAlpha(30),
+                          child: Icon(
+                            notificationTypeIcon(notification.type),
+                            color: notificationTypeColor(notification.type),
                           ),
                         ),
                         const SizedBox(width: 12),

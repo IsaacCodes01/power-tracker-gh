@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../models/notification_item.dart';
 
 class AdminAnnouncementsScreen extends StatefulWidget {
   const AdminAnnouncementsScreen({super.key});
@@ -24,6 +25,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
   final Set<String> _selectedAreas = {};
 
   final _firestoreService = FirestoreService();
+  NotificationType _selectedType = NotificationType.announcement;
 
   @override
   void initState() {
@@ -110,6 +112,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       for (final uid in targetUserIds) {
         await _firestoreService.createNotification(
           userId: uid,
+          type: _selectedType,
           title: title,
           message: message,
         );
@@ -181,6 +184,27 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                 validator: (value) => (value == null || value.trim().isEmpty)
                     ? 'Please enter a message'
                     : null,
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Type', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              SegmentedButton<NotificationType>(
+                segments: const [
+                  ButtonSegment(
+                    value: NotificationType.announcement,
+                    label: Text('General'),
+                    icon: Icon(Icons.campaign),
+                  ),
+                  ButtonSegment(
+                    value: NotificationType.maintenance,
+                    label: Text('Maintenance'),
+                    icon: Icon(Icons.build_circle),
+                  ),
+                ],
+                selected: {_selectedType},
+                onSelectionChanged: (selection) =>
+                    setState(() => _selectedType = selection.first),
               ),
               const SizedBox(height: 20),
 
