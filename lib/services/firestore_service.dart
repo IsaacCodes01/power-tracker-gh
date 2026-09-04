@@ -143,6 +143,10 @@ class FirestoreService {
     }).toList();
   }
 
+  Future<void> setAdminPin(String uid, String pin) async {
+    await _usersRef.doc(uid).update({'adminPin': pin});
+  }
+
   // ==========================================
   //            USER PROFILE METHODS
   // ==========================================

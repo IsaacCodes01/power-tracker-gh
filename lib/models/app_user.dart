@@ -8,6 +8,7 @@ class AppUser {
   final double? defaultLatitude;
   final double? defaultLongitude;
   final String? defaultLocationName;
+  final String? adminPin;
   final DateTime createdAt;
 
   // ADDED: The new optional phoneNumber property
@@ -17,6 +18,7 @@ class AppUser {
     required this.uid,
     required this.email,
     required this.role,
+    required this.adminPin,
     this.savedAreas = const [],
     this.defaultLatitude,
     this.defaultLongitude,
@@ -31,6 +33,7 @@ class AppUser {
       uid: data['uid'] ?? '',
       email: data['email'] ?? '',
       role: data['role'] ?? 'user',
+      adminPin: data['adminPin'],
       savedAreas: List<String>.from(data['savedAreas'] ?? []),
       defaultLatitude: (data['defaultLatitude'] as num?)?.toDouble(),
       defaultLongitude: (data['defaultLongitude'] as num?)?.toDouble(),
