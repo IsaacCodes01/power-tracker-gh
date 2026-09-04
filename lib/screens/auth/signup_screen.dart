@@ -77,18 +77,14 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // 1. FIXED: Pre-capture your UI states before the async operations run!
-    final navigator = Navigator.of(context);
-
     final hasConnection = await _connectivityService.hasConnection();
     if (!hasConnection) {
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: 'No internet connection. Please check your network.',
-          type: AppMessageType.error,
-        );
-      }
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'No internet connection. Please check your network.',
+        type: AppMessageType.error,
+      );
       return;
     }
 
@@ -98,47 +94,44 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      // 2. FIXED: Pull the full formatted value out of your country flag selection model
-      // (e.g. If Ghana flag is picked and they type 241234567, this evaluates to "+233241234567")
       final fullPhoneNumber = number.phoneNumber?.trim() ?? '';
 
       await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        // 3. FIXED: Passes your clean data payload directly down to your updated service!
         phoneNumber: fullPhoneNumber.isNotEmpty ? fullPhoneNumber : '',
       );
 
       await _authService.signOut();
 
-      // 4. FIXED: Safe execution trail using your clean pre-loaded instances!
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: 'Account created successfully! Please log in.',
-          type: AppMessageType.success,
-        );
-      }
+      if (!mounted) return;
 
-      navigator.pop();
+      AppSnackbar.show(
+        context,
+        message: 'Account created successfully! Please log in.',
+        type: AppMessageType.success,
+      );
 
-      navigator.pop();
+      // Wait for user to see message, then go back to Login ONCE
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // only ONCE
     } catch (e) {
       String displayError = e.toString();
+      // This NOT_FOUND hack is masking real errors
       if (displayError.contains('NOT_FOUND') ||
           displayError.contains('DEVELOPER_ERROR')) {
         await _authService.signOut();
-
-        // 5. FIXED: Safe custom developer error display handlers
-        if (mounted) {
-          AppSnackbar.show(
-            context,
-            message: 'Account registered! Please log in to your dashboard.',
-            type: AppMessageType.info,
-          );
-        }
-        navigator.pop();
-
+        if (!mounted) return;
+        AppSnackbar.show(
+          context,
+          message: 'Account registered! Please log in.',
+          type: AppMessageType.info,
+        );
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (!mounted) return;
+        Navigator.of(context).pop();
         return;
       }
 
