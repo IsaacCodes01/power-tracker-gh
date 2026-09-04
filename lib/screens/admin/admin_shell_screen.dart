@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_reports_screen.dart';
 import 'admin_announcements_screen.dart';
+import '../../widgets/notification_bell.dart';
+import '../../widgets/admin_mode_toggle.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -33,37 +35,35 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 onPressed: () => setState(() => _currentIndex = 0),
               )
             : null,
-        title: Text(_titles[_currentIndex]),
         backgroundColor: Colors.deepPurple[900],
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          if (_currentIndex == 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
+        title: null,
+        flexibleSpace: SafeArea(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                left: _currentIndex != 0 ? 56 : 16,
+                child: Text(
+                  _titles[_currentIndex],
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'User',
-                    style: TextStyle(
-                      color: Colors.deepPurple[900],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+              if (_currentIndex == 0)
+                const Align(
+                  alignment: Alignment.center,
+                  child: AdminModeToggle(isInsideAdminMode: true),
+                ),
+              if (_currentIndex == 0)
+                const Positioned(right: 8, child: NotificationBell()),
+            ],
+          ),
+        ),
       ),
       body: Stack(
         children: [

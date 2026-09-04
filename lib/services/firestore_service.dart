@@ -163,6 +163,11 @@ class FirestoreService {
     }
   }
 
+  Future<List<String>> getAdminUserIds() async {
+    final snapshot = await _usersRef.where('role', isEqualTo: 'admin').get();
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
   // Fetches every registered user's ID, used for broadcasting an
   // announcement to all users rather than a specific area.
   Future<List<String>> getAllUserIds() async {

@@ -5,7 +5,9 @@ import '../services/firestore_service.dart';
 import 'app_snackbar.dart';
 
 class AdminModeToggle extends StatefulWidget {
-  const AdminModeToggle({super.key});
+  final bool isInsideAdminMode;
+
+  const AdminModeToggle({super.key, this.isInsideAdminMode = false});
 
   @override
   State<AdminModeToggle> createState() => _AdminModeToggleState();
@@ -32,6 +34,28 @@ class _AdminModeToggleState extends State<AdminModeToggle> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isInsideAdminMode) {
+      // Inside admin mode: show "User", pop back out on tap.
+      return GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'User',
+            style: TextStyle(
+              color: Colors.deepPurple,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      );
+    }
+    // On Home: show "Admin", only for real admin accounts, push in on tap.
     if (_isLoading || !_isAdmin) return const SizedBox.shrink();
 
     return GestureDetector(

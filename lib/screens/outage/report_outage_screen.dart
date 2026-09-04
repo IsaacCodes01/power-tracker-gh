@@ -6,6 +6,7 @@ import 'location_picker_screen.dart';
 import '../main_navigation_screen.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../widgets/notification_bell.dart';
+import '../../models/notification_item.dart';
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -63,6 +64,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
   Future<void> _handleSubmit() async {
     final currentUser = _authService.currentUser;
+    if (_isSubmitting) return;
     if (currentUser == null) {
       AppSnackbar.show(
         context,
@@ -108,8 +110,39 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
     try {
       await _firestoreService.createReport(newReport);
+      await Future.delayed(Duration(seconds: 1));
       if (!mounted) return;
 
+      // Notify every admin that a new report has come in.
+      final adminIds = await _firestoreService.getAdminUserIds();
+      for (final adminId in adminIds) {
+        await _firestoreService.createNotification(
+          userId: adminId,
+          type: NotificationType.announcement,
+          title: 'New Report Submitted',
+          message:
+              '${newReport.area}: ${outageTypeLabel(newReport.outageType)}',
+        );
+      }
+
+      // Try to notify admins, but don't fail the whole submission if this fails
+      try {
+        final adminIds = await _firestoreService.getAdminUserIds();
+        for (final adminId in adminIds) {
+          await _firestoreService.createNotification(
+            userId: adminId,
+            type: NotificationType.announcement,
+            title: 'New Report Submitted',
+            message:
+                '${newReport.area}: ${outageTypeLabel(newReport.outageType)}',
+          );
+        }
+      } catch (_) {
+        // ignore notification error - report is already saved
+        debugPrint('Admin notification failed but report saved');
+      }
+
+      if (!mounted) return;
       AppSnackbar.show(
         context,
         message: 'Report created successfully',
