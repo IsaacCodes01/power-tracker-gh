@@ -12,7 +12,20 @@
           "package_name": "com.example.power_tracker_gh"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "568000509385-hp9u160i6qksen0jjontp9spgdc9uq7u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.power_tracker_gh",
+            "certificate_hash": "cadf78398bc98a9760b579f70734e7506e1df41d"
+          }
+        },
+        {
+          "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "568000509385-ijjr41neqfdlmiat2c7eqe0keaq67hhs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.powerTrackerGh"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,20 @@
           "package_name": "com.isaacotabil.power_tracker_gh"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "568000509385-cmsu7h1p934e0qjqruj7b4pkqid61ns9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.isaacotabil.power_tracker_gh",
+            "certificate_hash": "cadf78398bc98a9760b579f70734e7506e1df41d"
+          }
+        },
+        {
+          "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "568000509385-ijjr41neqfdlmiat2c7eqe0keaq67hhs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.powerTrackerGh"
+              }
+            }
+          ]
         }
       }
     },
@@ -50,7 +100,20 @@
           "package_name": "com.isaacotabil.powertrackergh"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "568000509385-6apnebj87gi8nnplg2ulir9qrmacrgs6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.isaacotabil.powertrackergh",
+            "certificate_hash": "cadf78398bc98a9760b579f70734e7506e1df41d"
+          }
+        },
+        {
+          "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyByKB_WgCgW5mJHRruwD_SpA2y7W7A4hAA"
@@ -58,7 +121,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "568000509385-g7192jtrtiaqf9nbnkhl87kbn1k6covd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "568000509385-ijjr41neqfdlmiat2c7eqe0keaq67hhs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.powerTrackerGh"
+              }
+            }
+          ]
         }
       }
     }

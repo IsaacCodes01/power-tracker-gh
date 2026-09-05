@@ -49,40 +49,56 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
         if (newStatus == OutageStatus.restored) 'endTime': Timestamp.now(),
       });
 
-      // Correct type based on status
-      final isRestored = newStatus == OutageStatus.restored;
+      // Only notify for genuine forward progress: investigating, repairing, restored.
+      final notifiableStatuses = {
+        OutageStatus.investigating,
+        OutageStatus.repairing,
+        OutageStatus.restored,
+      };
 
-      await _firestoreService.createNotification(
-        userId: _report.reporterId,
-        type: isRestored
-            ? NotificationType.powerRestored
-            : NotificationType.statusUpdate,
-        title: isRestored ? 'Power Restored' : 'Status Update',
-        message: isRestored
-            ? 'Good news! Power for ${_report.area} has been restored.'
-            : 'Your report for ${_report.area} is now ${_statusLabel(newStatus)}.',
-        relatedReportId: _report.id,
-      );
+      if (notifiableStatuses.contains(newStatus)) {
+        final isRestored = newStatus == OutageStatus.restored;
 
-      setState(() {
-        _report = OutageReport(
-          id: _report.id,
-          reporterId: _report.reporterId,
-          area: _report.area,
-          latitude: _report.latitude,
-          longitude: _report.longitude,
-          startTime: _report.startTime,
-          endTime: isRestored ? DateTime.now() : _report.endTime,
-          status: newStatus,
-          severity: _report.severity,
-          outageType: _report.outageType,
-          estimatedRestoration: _report.estimatedRestoration,
-          description: _report.description,
-          confirmedByUserIds: _report.confirmedByUserIds,
-          verified: _report.verified,
-          createdAt: _report.createdAt,
-        );
-      });
+        // Notify the reporter, plus everyone who confirmed the outage.
+        final recipientIds = {
+          _report.reporterId,
+          ..._report.confirmedByUserIds,
+        };
+
+        for (final uid in recipientIds) {
+          await _firestoreService.createNotification(
+            userId: uid,
+            type: isRestored
+                ? NotificationType.powerRestored
+                : NotificationType.statusUpdate,
+            title: isRestored ? 'Power Restored' : 'Status Update',
+            message: isRestored
+                ? 'Good news! Power for ${_report.area} has been restored.'
+                : 'Your report for ${_report.area} is now ${_statusLabel(newStatus)}.',
+            relatedReportId: _report.id,
+          );
+        }
+
+        setState(() {
+          _report = OutageReport(
+            id: _report.id,
+            reporterId: _report.reporterId,
+            area: _report.area,
+            latitude: _report.latitude,
+            longitude: _report.longitude,
+            startTime: _report.startTime,
+            endTime: isRestored ? DateTime.now() : _report.endTime,
+            status: newStatus,
+            severity: _report.severity,
+            outageType: _report.outageType,
+            estimatedRestoration: _report.estimatedRestoration,
+            description: _report.description,
+            confirmedByUserIds: _report.confirmedByUserIds,
+            verified: _report.verified,
+            createdAt: _report.createdAt,
+          );
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _isUpdating = false);

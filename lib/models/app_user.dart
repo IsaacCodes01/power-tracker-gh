@@ -10,6 +10,11 @@ class AppUser {
   final String? defaultLocationName;
   final String? adminPin;
   final DateTime createdAt;
+  final bool notifyPowerRestored;
+  final bool notifyStatusUpdates;
+  final bool notifyVerification;
+  final bool notifyAnnouncements;
+  final bool notifyMaintenance;
 
   // ADDED: The new optional phoneNumber property
   final String phoneNumber;
@@ -18,13 +23,18 @@ class AppUser {
     required this.uid,
     required this.email,
     required this.role,
-    required this.adminPin,
+    this.adminPin,
     this.savedAreas = const [],
     this.defaultLatitude,
     this.defaultLongitude,
     this.defaultLocationName,
     required this.createdAt,
     this.phoneNumber = '', // Default to an empty string if not provided
+    required this.notifyAnnouncements,
+    required this.notifyStatusUpdates,
+    required this.notifyVerification,
+    required this.notifyMaintenance,
+    required this.notifyPowerRestored,
   });
 
   // Converts a Firestore document into an AppUser object.
@@ -43,6 +53,11 @@ class AppUser {
           : DateTime.now(),
       // FIXED: Safely reads the phoneNumber from the Firestore document payload
       phoneNumber: data['phoneNumber'] ?? '',
+      notifyAnnouncements: data['notifyAnnouncements'] ?? true,
+      notifyStatusUpdates: data['notifyStatusUpdates'] ?? true,
+      notifyVerification: data['notifyVerification'] ?? true,
+      notifyMaintenance: data['notifyMaintenance'] ?? true,
+      notifyPowerRestored: data['notifyPowerRestored'] ?? true,
     );
   }
 
@@ -52,6 +67,7 @@ class AppUser {
       'uid': uid,
       'email': email,
       'role': role,
+      'adminPin': adminPin,
       'savedAreas': savedAreas,
       'defaultLatitude': defaultLatitude,
       'defaultLongitude': defaultLongitude,
@@ -59,6 +75,11 @@ class AppUser {
       'createdAt': Timestamp.fromDate(createdAt),
       // FIXED: Packs the phone number string into your database upload map
       'phoneNumber': phoneNumber,
+      'notifyAnnouncements': notifyAnnouncements,
+      'notifyStatusUpdates': notifyStatusUpdates,
+      'notifyVerification': notifyVerification,
+      'notifyMaintenance': notifyMaintenance,
+      'notifyPowerRestored': notifyPowerRestored,
     };
   }
 

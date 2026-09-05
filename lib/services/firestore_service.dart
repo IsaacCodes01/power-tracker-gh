@@ -14,6 +14,13 @@ class FirestoreService {
     await _reportsRef.add(report.toMap());
   }
 
+  Future<void> updateNotificationPreferences(
+    String uid,
+    Map<String, bool> prefs,
+  ) async {
+    await _usersRef.doc(uid).update(prefs);
+  }
+
   // Writes a new notification for a specific user.
   Future<void> createNotification({
     required String userId,
@@ -22,15 +29,27 @@ class FirestoreService {
     required String message,
     String? relatedReportId,
   }) async {
-    await _notificationsRef.add({
-      'userId': userId,
-      'type': type.name,
-      'title': title,
-      'message': message,
-      'read': false,
-      'relatedReportId': relatedReportId,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    final profile = await getUserProfile(userId);
+    if (profile != null) {
+      final allowed = switch (type) {
+        NotificationType.reportVerified => profile.notifyVerification,
+        NotificationType.powerRestored => profile.notifyPowerRestored,
+        NotificationType.statusUpdate => profile.notifyStatusUpdates,
+        NotificationType.announcement => profile.notifyAnnouncements,
+        NotificationType.maintenance => profile.notifyMaintenance,
+      };
+      if (!allowed) return;
+
+      await _notificationsRef.add({
+        'userId': userId,
+        'type': type.name,
+        'title': title,
+        'message': message,
+        'read': false,
+        'relatedReportId': relatedReportId,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
   }
 
   // Live list of one user's notifications, newest first.
@@ -66,6 +85,17 @@ class FirestoreService {
 
   Future<void> markNotificationRead(String notificationId) async {
     await _notificationsRef.doc(notificationId).update({'read': true});
+  }
+
+  Future<void> markAllNotificationsRead(String userId) async {
+    final snapshot = await _notificationsRef
+        .where('userId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      await doc.reference.update({'read': true});
+    }
   }
 
   final CollectionReference _notificationsRef = FirebaseFirestore.instance

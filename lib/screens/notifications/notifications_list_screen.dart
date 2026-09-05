@@ -28,6 +28,15 @@ class NotificationsListScreen extends StatelessWidget {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.done_all),
+            tooltip: 'Mark all as read',
+            onPressed: () async {
+              await firestoreService.markAllNotificationsRead(uid);
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<List<NotificationItem>>(
         stream: firestoreService.streamNotifications(uid),

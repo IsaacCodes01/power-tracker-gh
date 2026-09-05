@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
 
 class AuthService {
@@ -152,5 +153,43 @@ class AuthService {
       default:
         return 'Something went wrong. Please try again.';
     }
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    // For google_sign_in ^7.0.0
+    await GoogleSignIn.instance.initialize();
+
+    final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+        .authenticate();
+
+    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+    final String? idToken = googleAuth.idToken;
+
+    if (idToken == null) throw 'No ID Token found';
+
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+
+    final userCred = await _auth.signInWithCredential(credential);
+
+    // Create Firestore doc if new user
+    final uid = userCred.user!.uid;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (!doc.exists) {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'uid': uid,
+        'email': userCred.user!.email,
+        'role': 'user',
+        'phoneNumber': userCred.user!.phoneNumber ?? '',
+        'savedAreas': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'notifyLocationAlerts': true,
+        'notifyUserActions': true,
+        'notifyVerification': true,
+      });
+    }
+    return userCred;
   }
 }
