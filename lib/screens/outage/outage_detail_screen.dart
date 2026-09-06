@@ -7,6 +7,7 @@ import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../models/notification_item.dart';
+import 'edit_report_screen.dart';
 
 class OutageDetailScreen extends StatefulWidget {
   final OutageReport report;
@@ -177,8 +178,31 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
       appBar: AppBar(
         title: Text(_report.area),
         backgroundColor: Colors.deepPurple,
-        elevation: 0,
         foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          if (_canMarkRestored && _report.status != OutageStatus.restored)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit report',
+              onPressed: () async {
+                final updated = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditReportScreen(report: _report),
+                  ),
+                );
+                if (updated == true) {
+                  final refreshed = await _firestoreService.getReport(
+                    _report.id,
+                  );
+                  if (refreshed != null && mounted) {
+                    setState(() => _report = refreshed);
+                  }
+                }
+              },
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

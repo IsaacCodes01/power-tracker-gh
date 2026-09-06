@@ -113,18 +113,6 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       await Future.delayed(Duration(seconds: 1));
       if (!mounted) return;
 
-      // Notify every admin that a new report has come in.
-      final adminIds = await _firestoreService.getAdminUserIds();
-      for (final adminId in adminIds) {
-        await _firestoreService.createNotification(
-          userId: adminId,
-          type: NotificationType.announcement,
-          title: 'New Report Submitted',
-          message:
-              '${newReport.area}: ${outageTypeLabel(newReport.outageType)}',
-        );
-      }
-
       // Try to notify admins, but don't fail the whole submission if this fails
       try {
         final adminIds = await _firestoreService.getAdminUserIds();
