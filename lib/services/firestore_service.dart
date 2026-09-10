@@ -37,6 +37,10 @@ class FirestoreService {
         NotificationType.statusUpdate => profile.notifyStatusUpdates,
         NotificationType.announcement => profile.notifyAnnouncements,
         NotificationType.maintenance => profile.notifyMaintenance,
+        // Admins don't have a dedicated toggle for this — it's an
+        // operational "you have work to do" notification, not a
+        // discretionary broadcast, so it's always on.
+        NotificationType.newReport => true,
       };
       if (!allowed) return;
 
@@ -103,7 +107,29 @@ class FirestoreService {
 
   // READ (live list): keeps watching the cabinet and hands back
   // an updated list automatically whenever anything changes.
+  // READ (live list): keeps watching the cabinet and hands back
+  // an updated list automatically whenever anything changes.
   Stream<List<OutageReport>> streamReports() {
+    return _reportsRef
+        .orderBy('createdAt', descending: true)
+        .limit(500) // was 100, now 500 to avoid crowding
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => OutageReport.fromMap(
+                  doc.id,
+                  doc.data() as Map<String, dynamic>,
+                ),
+              )
+              .where(_isVisibleInFeed)
+              .take(100)
+              .toList(),
+        );
+  }
+
+  // FOR ADMINS: Admin panel uses this - sees ALL reports, no filter
+  Stream<List<OutageReport>> streamReportsForAdmin() {
     return _reportsRef
         .orderBy('createdAt', descending: true)
         .limit(100)
@@ -118,6 +144,20 @@ class FirestoreService {
               )
               .toList(),
         );
+  }
+
+  // NEW: A resolved report stays visible for 48h after endTime, then
+  // drops out of the feed. It is never deleted — admin/history views
+  // that bypass this stream still see everything.
+  bool _isVisibleInFeed(OutageReport report) {
+    if (report.status != OutageStatus.restored) return true;
+    if (report.endTime == null) {
+      return true; // safety fallback, don't hide bad data
+    }
+    final hoursSinceResolved = DateTime.now()
+        .difference(report.endTime!)
+        .inHours;
+    return hoursSinceResolved < 48;
   }
 
   // READ (single report): pulls out one specific form by its ID.
