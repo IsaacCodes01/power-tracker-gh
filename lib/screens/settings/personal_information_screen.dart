@@ -24,12 +24,13 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   final _firestoreService = FirestoreService();
 
   bool _isSaving = false;
-  bool _isLoadingData = true; // Tracks initial database profile load cleanly
+  bool _isLoadingData = true;
+  bool _showPhonePicker = false; // FIX: lazy load picker
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfileData(); // Loads the profile packet once right on boot up
+    _loadUserProfileData();
   }
 
   @override
@@ -39,7 +40,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     super.dispose();
   }
 
-  // FIXED: Asynchronously handles database pulling and country parsing upfront
   Future<void> _loadUserProfileData() async {
     try {
       final currentUid = _authService.currentUser?.uid ?? '';
@@ -49,39 +49,48 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         _emailController.text = appUser.email;
 
         if (appUser.phoneNumber.isNotEmpty) {
-          // Wait for the international number tool to unpack the country prefix
-          final parsedNumber = await PhoneNumber.getRegionInfoFromPhoneNumber(
-            appUser.phoneNumber,
-          );
-          if (mounted) {
-            setState(() {
-              number = parsedNumber;
-              _phoneController.text = appUser.phoneNumber.replaceFirst(
-                parsedNumber.dialCode ?? '',
-                '',
-              );
-            });
+          // FAST GHANA-ONLY PARSE: no world lookup
+          String phone = appUser.phoneNumber;
+          // remove +233 if present
+          if (phone.startsWith('+233')) {
+            phone = phone.replaceFirst('+233', '');
+          } else if (phone.startsWith('233')) {
+            phone = phone.replaceFirst('233', '');
           }
+          // ensure it starts with 0
+          if (!phone.startsWith('0')) {
+            phone = '0$phone';
+          }
+
+          setState(() {
+            number = PhoneNumber(
+              isoCode: 'GH',
+              dialCode: '+233',
+              phoneNumber: '+233${phone.substring(1)}',
+            );
+            _phoneController.text = phone;
+          });
         }
       }
     } catch (e) {
-      debugPrint("Error initializing personal info data tracks: $e");
+      debugPrint("Error initializing personal info: $e");
     } finally {
       if (mounted) {
-        setState(
-          () => _isLoadingData = false,
-        ); // Turns off loading spinner safely
+        setState(() => _isLoadingData = false);
+        // Load picker AFTER data + after frame = instant screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) setState(() => _showPhonePicker = true);
+          });
+        });
       }
     }
   }
 
   Future<void> _handleSave(String uid) async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSaving = true);
-
     final navigator = Navigator.of(context);
-
     try {
       final newEmail = _emailController.text.trim();
       final newPhone = number.phoneNumber?.trim() ?? '';
@@ -91,16 +100,13 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         setState(() => _isSaving = false);
         return;
       }
-
       if (newEmail != _authService.currentUser?.email) {
         await _authService.updateEmail(newEmail);
       }
-
       await _firestoreService.updateUserProfile(uid, {
         'email': newEmail,
         'phoneNumber': newPhone,
       });
-
       if (mounted) {
         AppSnackbar.show(
           context,
@@ -118,16 +124,13 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final currentUid = _authService.currentUser?.uid ?? '';
-
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -136,7 +139,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         elevation: 0,
         foregroundColor: Colors.white,
       ),
-      // FIXED: Swapped out FutureBuilder for a clean, deterministic local state check
       body: _isLoadingData
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -155,7 +157,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -172,46 +173,60 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                               prefixIcon: Icon(Icons.email_outlined),
                               border: OutlineInputBorder(),
                             ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Email cannot be left empty';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                ? 'Email cannot be left empty'
+                                : null,
                           ),
                           const SizedBox(height: 20),
-
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
                               border: Border.all(color: Colors.grey),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: InternationalPhoneNumberInput(
-                              onInputChanged: (PhoneNumber value) {
-                                number = value;
-                              },
-                              textFieldController: _phoneController,
-                              initialValue: number,
-                              selectorConfig: const SelectorConfig(
-                                selectorType: PhoneInputSelectorType.DROPDOWN,
-                                setSelectorButtonAsPrefixIcon: true,
-                                leadingPadding: 16.0,
-                              ),
-                              ignoreBlank: true,
-                              autoValidateMode:
-                                  AutovalidateMode.onUserInteraction,
-                              inputDecoration: const InputDecoration(
-                                labelText: 'Phone Number (Optional)',
-                                border: InputBorder.none,
-                              ),
-                            ),
+                            height: 62,
+                            child: _showPhonePicker
+                                ? InternationalPhoneNumberInput(
+                                    countries: const ['GH'],
+                                    // GHANA ONLY - super fast
+                                    onInputChanged: (PhoneNumber value) {
+                                      number = value;
+                                    },
+                                    textFieldController: _phoneController,
+                                    initialValue: number,
+                                    selectorConfig: const SelectorConfig(
+                                      selectorType:
+                                          PhoneInputSelectorType.DROPDOWN,
+                                      setSelectorButtonAsPrefixIcon: true,
+                                      leadingPadding: 16.0,
+                                    ),
+                                    ignoreBlank: true,
+                                    autoValidateMode:
+                                        AutovalidateMode.onUserInteraction,
+                                    inputDecoration: const InputDecoration(
+                                      labelText: 'Phone Number (Optional)',
+                                      border: InputBorder.none,
+                                    ),
+                                  )
+                                : const Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text('Loading phone field...'),
+                                    ],
+                                  ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 28),
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
