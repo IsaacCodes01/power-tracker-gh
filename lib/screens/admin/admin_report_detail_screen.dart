@@ -209,18 +209,66 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Outage Type: ${outageTypeLabel(_report.outageType)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      Icon(
+                        outageTypeIcon(_report.outageType),
+                        size: 16,
+                        color: Colors.deepPurple,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Outage Type: ${outageTypeLabel(_report.outageType)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text('Severity: ${_report.severity.name}'),
-                  const SizedBox(height: 8),
-                  Text(_report.description),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Confirmed by ${_report.confirmedByUserIds.length} user(s)',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 16,
+                        color: severityColor(_report.severity),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Severity: ${_report.severity.name}',
+                        style: TextStyle(
+                          color: severityColor(_report.severity),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.description_outlined,
+                        size: 16,
+                        color: Colors.black,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(_report.description)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people_outline,
+                        size: 16,
+                        color: Colors.pink[600],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Confirmed by ${_report.confirmedByUserIds.length} user(s)',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),

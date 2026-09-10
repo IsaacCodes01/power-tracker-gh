@@ -10,32 +10,6 @@ class AdminReportsScreen extends StatefulWidget {
   State<AdminReportsScreen> createState() => _AdminReportsScreenState();
 }
 
-IconData outageTypeIcon(OutageType type) {
-  switch (type) {
-    case OutageType.powerOutage:
-      return Icons.power_off;
-    case OutageType.flickeringLights:
-      return Icons.lightbulb_outline;
-    case OutageType.voltageFluctuation:
-      return Icons.bolt;
-    case OutageType.poleFault:
-      return Icons.report_problem_outlined;
-  }
-}
-
-Color outageTypeColor(OutageType type) {
-  switch (type) {
-    case OutageType.powerOutage:
-      return Colors.redAccent;
-    case OutageType.flickeringLights:
-      return Colors.amber[800]!;
-    case OutageType.voltageFluctuation:
-      return Colors.blue;
-    case OutageType.poleFault:
-      return Colors.deepOrange;
-  }
-}
-
 class _AdminReportsScreenState extends State<AdminReportsScreen> {
   OutageType? _selectedType; // null means "All"
   late final Stream<List<OutageReport>> _reportsStream;
@@ -43,7 +17,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   @override
   void initState() {
     super.initState();
-    _reportsStream = FirestoreService().streamReports();
+    _reportsStream = FirestoreService().streamReportsForAdmin();
   }
 
   @override

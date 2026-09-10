@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 enum OutageStatus { reported, investigating, repairing, restored }
 
@@ -16,6 +17,49 @@ String outageTypeLabel(OutageType type) {
       return 'Voltage Fluctuation';
     case OutageType.poleFault:
       return 'Pole Fault';
+  }
+}
+
+// Shared with OutageCard/AdminReportCard so every screen shows the same
+// icon for a given outage type instead of each screen picking its own.
+IconData outageTypeIcon(OutageType type) {
+  switch (type) {
+    case OutageType.powerOutage:
+      return Icons.power_off;
+    case OutageType.flickeringLights:
+      return Icons.lightbulb_outline;
+    case OutageType.voltageFluctuation:
+      return Icons.bolt;
+    case OutageType.poleFault:
+      return Icons.report_problem_outlined;
+  }
+}
+
+// Shared per-type accent color, used anywhere an outage type gets its own
+// badge or icon tint (admin overview tiles, filter chips, etc).
+Color outageTypeColor(OutageType type) {
+  switch (type) {
+    case OutageType.powerOutage:
+      return Colors.redAccent;
+    case OutageType.flickeringLights:
+      return Colors.amber[800]!;
+    case OutageType.voltageFluctuation:
+      return Colors.blue;
+    case OutageType.poleFault:
+      return Colors.deepOrange;
+  }
+}
+
+// Severity color scale used anywhere severity needs an icon/badge —
+// escalates from calm to urgent the same way status colors do.
+Color severityColor(OutageSeverity severity) {
+  switch (severity) {
+    case OutageSeverity.minor:
+      return Colors.blue;
+    case OutageSeverity.moderate:
+      return Colors.orange;
+    case OutageSeverity.major:
+      return Colors.redAccent;
   }
 }
 

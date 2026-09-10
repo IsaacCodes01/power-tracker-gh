@@ -20,32 +20,6 @@ class AdminReportCard extends StatelessWidget {
     }
   }
 
-  IconData outageTypeIcon(OutageType type) {
-    switch (type) {
-      case OutageType.powerOutage:
-        return Icons.power_off;
-      case OutageType.flickeringLights:
-        return Icons.lightbulb_outline;
-      case OutageType.voltageFluctuation:
-        return Icons.bolt;
-      case OutageType.poleFault:
-        return Icons.report_problem_outlined;
-    }
-  }
-
-  Color outageTypeColor(OutageType type) {
-    switch (type) {
-      case OutageType.powerOutage:
-        return Colors.redAccent;
-      case OutageType.flickeringLights:
-        return Colors.amber[800]!;
-      case OutageType.voltageFluctuation:
-        return Colors.blue;
-      case OutageType.poleFault:
-        return Colors.deepOrange;
-    }
-  }
-
   String _statusLabel(OutageStatus status) {
     switch (status) {
       case OutageStatus.restored:
@@ -92,7 +66,7 @@ class AdminReportCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.location_on, size: 18, color: Colors.grey[500]),
+                  Icon(Icons.location_on, size: 18, color: Colors.red[500]),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -145,17 +119,30 @@ class AdminReportCard extends StatelessWidget {
               ),
               if (report.description.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(
-                  report.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.description_outlined,
+                      size: 16,
+                      color: Colors.black,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        report.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                      ),
+                    ),
+                  ],
                 ),
               ],
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.people_outline, size: 14, color: Colors.grey[600]),
+                  Icon(Icons.people_outline, size: 14, color: Colors.pink[600]),
                   const SizedBox(width: 4),
                   Text(
                     '${report.confirmedByUserIds.length} confirmed',
