@@ -119,7 +119,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
         for (final adminId in adminIds) {
           await _firestoreService.createNotification(
             userId: adminId,
-            type: NotificationType.announcement,
+            type: NotificationType.newReport,
             title: 'New Report Submitted',
             message:
                 '${newReport.area}: ${outageTypeLabel(newReport.outageType)}',

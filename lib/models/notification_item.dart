@@ -6,6 +6,7 @@ enum NotificationType {
   statusUpdate,
   announcement,
   maintenance,
+  newReport,
 }
 
 class NotificationItem {

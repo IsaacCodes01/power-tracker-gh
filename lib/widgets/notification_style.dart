@@ -13,6 +13,8 @@ IconData notificationTypeIcon(NotificationType type) {
       return Icons.campaign;
     case NotificationType.maintenance:
       return Icons.build_circle;
+    case NotificationType.newReport:
+      return Icons.assignment;
   }
 }
 
@@ -28,5 +30,7 @@ Color notificationTypeColor(NotificationType type) {
       return Colors.deepPurple;
     case NotificationType.maintenance:
       return Colors.red;
+    case NotificationType.newReport:
+      return Colors.indigo;
   }
 }
