@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
+import 'verify_email_gate_screen.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../widgets/link_google_account_dialog.dart';
 import '../../services/connectivity_service.dart';
 import '../main_navigation_screen.dart';
 
@@ -103,21 +105,49 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
     try {
-      await _authService.signIn(
+      final user = await _authService.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: 'Login successful',
-          type: AppMessageType.success,
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-        );
+
+      if (user == null) return;
+
+      await user.reload();
+      final verified = _authService.currentUser?.emailVerified ?? false;
+
+      if (!mounted) return;
+
+      if (!verified) {
+        if (mounted) {
+          // Route to the dedicated verification screen (with its own
+          // resend button / instructions) instead of just blocking here.
+          // User stays signed in so that screen can call
+          // sendEmailVerification() and check status without asking for
+          // credentials again.
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const VerifyEmailGateScreen()),
+            (route) => false,
+          );
+        }
+        return;
       }
+
+      // EMERGENCY FIX: push forward immediately instead of waiting on
+      // AppGatekeeper's stream, which was leaving the button stuck on
+      // its loading spinner. AppGatekeeper still exists and will simply
+      // agree once its stream catches up — this doesn't fight it, it
+      // just stops the UI from hanging in the meantime.
+      AppSnackbar.show(
+        context,
+        message: 'Login successful',
+        type: AppMessageType.success,
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -144,29 +174,74 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
     try {
-      await _authService.signInWithGoogle();
-      if (mounted) {
+      final userCred = await _authService.signInWithGoogle();
+
+      // User cancelled the Google sheet - silent return
+      if (userCred == null) {
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+
+      if (!mounted) return;
+
+      AppSnackbar.show(
+        context,
+        message: 'Signed in with Google',
+        type: AppMessageType.success,
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
+    } on AccountExistsException catch (e) {
+      // This email already has a password-based account. Ask for that
+      // password and link the two instead of just failing.
+      if (!mounted) return;
+
+      final linked = await showLinkGoogleAccountDialog(
+        context,
+        email: e.email,
+        pendingCredential: e.pendingCredential,
+      );
+
+      if (!mounted) return;
+      setState(() => _isGoogleLoading = false);
+
+      if (linked != null) {
         AppSnackbar.show(
           context,
-          message: 'Signed in with Google',
+          message: 'Google account linked. Signed in.',
           type: AppMessageType.success,
         );
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
         );
       }
+      // linked == null means they cancelled the dialog — stay on login.
+      return;
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-      });
-      if (mounted) {
-        AppSnackbar.show(
-          context,
-          message: e.toString(),
-          type: AppMessageType.error,
-        );
+      if (!mounted) return;
+
+      final msg = e.toString().toLowerCase();
+      // Cancelled - show NOTHING
+      if (msg.contains('cancel') ||
+          msg.contains('closed_by_user') ||
+          msg.contains('popup_closed') ||
+          msg.contains('12501')) {
+        setState(() => _isGoogleLoading = false);
+        return;
       }
+
+      // Real error - simple message only
+      AppSnackbar.show(
+        context,
+        message: 'Unable to sign in. Please try again.',
+        type: AppMessageType.error,
+      );
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -456,12 +531,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: TextButton.styleFrom(
                               foregroundColor: kDeepPurple,
                             ),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SignupScreen(),
-                              ),
-                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                PageRouteBuilder(
+                                  transitionDuration: const Duration(
+                                    milliseconds: 120,
+                                  ),
+                                  pageBuilder: (_, _, _) =>
+                                      const SignupScreen(),
+                                  transitionsBuilder: (_, anim, _, child) =>
+                                      FadeTransition(
+                                        opacity: anim,
+                                        child: child,
+                                      ),
+                                ),
+                              );
+                            },
                             child: const Text(
                               'Sign Up',
                               style: TextStyle(fontWeight: FontWeight.bold),
