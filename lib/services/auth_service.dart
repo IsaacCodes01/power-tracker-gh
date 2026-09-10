@@ -3,6 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
 
+// Thrown by signInWithGoogle() when the Google email already belongs to
+// an account created with a different sign-in method (almost always
+// email/password here). Carries what's needed to let the UI prompt for
+// that password and link the two accounts together.
+class AccountExistsException implements Exception {
+  final String email;
+  final AuthCredential pendingCredential;
+
+  AccountExistsException(
+      {required this.email, required this.pendingCredential});
+}
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -17,7 +29,10 @@ class AuthService {
   // SIGN UP: creates the account in Firebase Auth, then creates a matching
   // user profile document in Firestore with role hardcoded to "user".
   // UPDATED: Added the optional phoneNumber argument here.
+  // ADDED: fullName is now required so we can greet the user by first name
+  // and show their name in Settings.
   Future<User?> signUp({
+    required String fullName,
     required String email,
     required String password,
     String? phoneNumber,
@@ -30,6 +45,29 @@ class AuthService {
 
       final user = credential.user;
       if (user != null) {
+        final trimmedFullName = fullName.trim();
+        final firstName = trimmedFullName.isNotEmpty
+            ? trimmedFullName
+            .split(' ')
+            .first
+            : '';
+
+        // ADDED: keep Firebase Auth's own displayName in sync too, so it
+        // shows up consistently anywhere Firebase surfaces it natively.
+        try {
+          await user.updateDisplayName(trimmedFullName);
+        } catch (displayNameError) {
+          debugPrint("⚠️ updateDisplayName failed: $displayNameError");
+        }
+
+        // ADDED: send Firebase's built-in verification email right away,
+        // using its default template — no custom email service needed.
+        try {
+          await user.sendEmailVerification();
+        } catch (verificationError) {
+          debugPrint("⚠️ sendEmailVerification failed: $verificationError");
+        }
+
         // Every new signup is a regular user, no exceptions.
         // We catch errors locally here so a Firestore failure won't crash the Auth process!
         try {
@@ -40,6 +78,9 @@ class AuthService {
             'createdAt': FieldValue.serverTimestamp(),
             // FIXED: Safely logs the phone number field or defaults to an empty string
             'phoneNumber': phoneNumber ?? '',
+            // ADDED: full name + derived first name for greetings
+            'fullName': trimmedFullName,
+            'firstName': firstName,
           });
         } catch (databaseError) {
           // Log the error to your terminal console so you know about it,
@@ -76,6 +117,49 @@ class AuthService {
   // SIGN OUT
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  // ADDED: resend the verification email while the user is currently
+  // signed in (e.g. right after login, before we've signed them back out).
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw 'No signed-in user. Please log in again to resend.';
+    }
+    if (user.emailVerified) {
+      throw 'Your email is already verified.';
+    }
+    await user.sendEmailVerification();
+  }
+
+  // ADDED: resend the verification email when the user is signed OUT —
+  // needs their email/password to sign in briefly, send, then sign back out.
+  Future<void> resendVerificationAfterLogout({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = cred.user;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+      }
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
+  }
+
+  // ADDED: forces Firebase to refresh the user's token/data so
+  // emailVerified reflects whether they clicked the link yet.
+  Future<bool> reloadAndCheckVerified() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return _auth.currentUser?.emailVerified ?? false;
   }
 
   // PASSWORD RESET: sends a reset link to the user's email via Firebase.
@@ -155,41 +239,130 @@ class AuthService {
     }
   }
 
-  Future<UserCredential> signInWithGoogle() async {
-    // For google_sign_in ^7.0.0
-    await GoogleSignIn.instance.initialize();
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      // For google_sign_in ^7.0.0
+      await GoogleSignIn.instance.initialize();
 
-    final GoogleSignInAccount googleUser = await GoogleSignIn.instance
-        .authenticate();
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+          .authenticate();
 
-    final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-    final String? idToken = googleAuth.idToken;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
 
-    if (idToken == null) throw 'No ID Token found';
+      if (idToken == null) throw 'No ID Token found';
 
-    final credential = GoogleAuthProvider.credential(idToken: idToken);
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
 
-    final userCred = await _auth.signInWithCredential(credential);
+      UserCredential userCred;
+      try {
+        userCred = await _auth.signInWithCredential(credential);
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'account-exists-with-different-credential') {
+          // Same email already has an account under a different provider
+          // (e.g. email/password signup). Hand the pending Google
+          // credential up to the UI so it can ask for that password and
+          // link the two, instead of just failing here.
+          throw AccountExistsException(
+            email: e.email ?? googleUser.email,
+            pendingCredential: credential,
+          );
+        }
+        rethrow;
+      }
 
-    // Create Firestore doc if new user
-    final uid = userCred.user!.uid;
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get();
-    if (!doc.exists) {
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'uid': uid,
-        'email': userCred.user!.email,
-        'role': 'user',
-        'phoneNumber': userCred.user!.phoneNumber ?? '',
-        'savedAreas': [],
-        'createdAt': FieldValue.serverTimestamp(),
-        'notifyLocationAlerts': true,
-        'notifyUserActions': true,
-        'notifyVerification': true,
-      });
+      // Create Firestore doc if new user
+      final uid = userCred.user!.uid;
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (!doc.exists) {
+        final displayName = userCred.user!.displayName ?? '';
+        final firstName = displayName
+            .trim()
+            .isNotEmpty
+            ? displayName
+            .trim()
+            .split(' ')
+            .first
+            : '';
+
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'uid': uid,
+          'email': userCred.user!.email,
+          'role': 'user',
+          'phoneNumber': userCred.user!.phoneNumber ?? '',
+          'savedAreas': [],
+          'createdAt': FieldValue.serverTimestamp(),
+          'fullName': displayName,
+          'firstName': firstName,
+          'notifyPowerRestored': true,
+          'notifyStatusUpdates': true,
+          'notifyVerification': true,
+          'notifyAnnouncements': true,
+          'notifyMaintenance': true,
+        });
+      }
+      return userCred;
+    } on GoogleSignInException catch (e) {
+      // v7 throws this when user closes the sheet
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return null; // User cancelled - silent
+      }
+      rethrow;
+    } on AccountExistsException {
+      rethrow;
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('cancel') || msg.contains('12501')) {
+        return null;
+      }
+      rethrow;
     }
-    return userCred;
+  }
+
+  // Called after an AccountExistsException: signs in with the existing
+  // password account, then links the pending Google credential onto that
+  // same account so either sign-in method works from now on. Also
+  // backfills fullName from Google if the account didn't already have one
+  // saved (e.g. it was created via manual signup without a name field, or
+  // an older version of the app).
+  Future<UserCredential> linkGoogleWithPassword({
+    required String email,
+    required String password,
+    required AuthCredential pendingCredential,
+  }) async {
+    try {
+      final passwordCred = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = passwordCred.user;
+      if (user == null) throw 'Sign in failed.';
+
+      final linkedCred = await user.linkWithCredential(pendingCredential);
+
+      final displayName =
+      (linkedCred.user?.displayName ?? user.displayName ?? '').trim();
+      if (displayName.isNotEmpty) {
+        final docRef = _firestore.collection('users').doc(user.uid);
+        final doc = await docRef.get();
+        final existingFullName =
+        (doc.data()?['fullName'] as String? ?? '').trim();
+        if (existingFullName.isEmpty) {
+          await docRef.update({
+            'fullName': displayName,
+            'firstName': displayName
+                .split(' ')
+                .first,
+          });
+        }
+      }
+
+      return linkedCred;
+    } on FirebaseAuthException catch (e) {
+      throw _mapAuthError(e);
+    }
   }
 }
