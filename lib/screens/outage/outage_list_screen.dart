@@ -11,7 +11,9 @@ import 'location_picker_screen.dart';
 enum ReportFilter { all, mine, restored, noLight, confirmed, yourLocation }
 
 class OutageListScreen extends StatefulWidget {
-  const OutageListScreen({super.key});
+  final ReportFilter? initialFilter;
+
+  const OutageListScreen({super.key, this.initialFilter});
 
   @override
   State<OutageListScreen> createState() => _OutageListScreenState();
@@ -22,7 +24,7 @@ class _OutageListScreenState extends State<OutageListScreen> {
   final _authService = AuthService();
   final _searchController = TextEditingController();
 
-  ReportFilter _selectedFilter = ReportFilter.all;
+  late ReportFilter _selectedFilter = widget.initialFilter ?? ReportFilter.all;
   String _searchQuery = '';
 
   AppUser? _userProfile;

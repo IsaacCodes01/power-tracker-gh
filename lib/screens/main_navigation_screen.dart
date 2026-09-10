@@ -20,6 +20,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   final _authService = AuthService();
 
+  // Set right before jumping to the Outages tab from Home, so it opens
+  // already filtered (e.g. tapping "Active Outages" opens "No Light").
+  // Null just opens the tab with its default "All" filter, same as
+  // tapping the bottom nav item directly.
+  ReportFilter? _pendingOutageFilter;
+
   bool _isAdmin = false;
   bool _isLoadingRole = true;
 
@@ -99,11 +105,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final screens = [
       HomeScreen(
         onNavigateToReport: () => setState(() => _currentIndex = 2),
-        onNavigateToOutages: () => setState(() => _currentIndex = 3),
+        onNavigateToOutages: (filter) => setState(() {
+          _pendingOutageFilter = filter;
+          _currentIndex = 3;
+        }),
       ),
       const OutageMapScreen(),
       const ReportOutageScreen(),
-      const OutageListScreen(),
+      OutageListScreen(
+        key: ValueKey(_pendingOutageFilter),
+        initialFilter: _pendingOutageFilter,
+      ),
       const SettingsScreen(),
       if (_isAdmin)
         AdminDashboardScreen(
