@@ -16,7 +16,7 @@ class AdminDashboardScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: StreamBuilder<List<OutageReport>>(
-        stream: firestoreService.streamReports(),
+        stream: firestoreService.streamReportsForAdmin(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
