@@ -19,6 +19,10 @@ class AppUser {
   // ADDED: The new optional phoneNumber property
   final String phoneNumber;
 
+  // ADDED: Full name + derived first name, used for greetings and display.
+  final String fullName;
+  final String firstName;
+
   AppUser({
     required this.uid,
     required this.email,
@@ -30,6 +34,8 @@ class AppUser {
     this.defaultLocationName,
     required this.createdAt,
     this.phoneNumber = '', // Default to an empty string if not provided
+    this.fullName = '',
+    this.firstName = '',
     required this.notifyAnnouncements,
     required this.notifyStatusUpdates,
     required this.notifyVerification,
@@ -53,6 +59,10 @@ class AppUser {
           : DateTime.now(),
       // FIXED: Safely reads the phoneNumber from the Firestore document payload
       phoneNumber: data['phoneNumber'] ?? '',
+      // ADDED: Safely reads fullName/firstName; older accounts created before
+      // this field existed will just fall back to empty strings.
+      fullName: data['fullName'] ?? '',
+      firstName: data['firstName'] ?? '',
       notifyAnnouncements: data['notifyAnnouncements'] ?? true,
       notifyStatusUpdates: data['notifyStatusUpdates'] ?? true,
       notifyVerification: data['notifyVerification'] ?? true,
@@ -75,6 +85,9 @@ class AppUser {
       'createdAt': Timestamp.fromDate(createdAt),
       // FIXED: Packs the phone number string into your database upload map
       'phoneNumber': phoneNumber,
+      // ADDED: persist fullName/firstName alongside everything else
+      'fullName': fullName,
+      'firstName': firstName,
       'notifyAnnouncements': notifyAnnouncements,
       'notifyStatusUpdates': notifyStatusUpdates,
       'notifyVerification': notifyVerification,
@@ -88,4 +101,17 @@ class AppUser {
   // True once the user has genuinely set a default location at least once.
   bool get hasDefaultLocation =>
       defaultLatitude != null && defaultLongitude != null;
+
+  // ADDED: Best available first name for greetings. Falls back gracefully
+  // for accounts created before fullName/firstName existed.
+  String get greetingName {
+    if (firstName.isNotEmpty) return firstName;
+    if (fullName.trim().isNotEmpty) return fullName.trim().split(' ').first;
+    if (email.contains('@')) return email.split('@').first;
+    return '';
+  }
+
+  // ADDED: Role label shown under the user's name in Settings.
+  String get roleLabel =>
+      isAdmin ? 'Power Tracker admin' : 'Power Tracker user';
 }
