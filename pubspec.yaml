@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_fonts: ^6.2.1
   lottie: ^3.1.2
   intl_phone_number_input: ^0.7.4
   cupertino_icons: ^1.0.8
@@ -34,15 +33,16 @@ flutter:
   uses-material-design: true
   assets:
     - assets/animations/bolt_animation.json
-    - assets/icon.png
     - assets/google_g.png
 
 
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icon.png"
+  image_path: "assets/icon_full_bleed.png"
   min_sdk_android: 21
+  adaptive_icon_background: "assets/adaptive_icon_background.png"
+  adaptive_icon_foreground: "assets/adaptive_icon_foreground.png"
   web:
     generate: true
-    image_path: "assets/icon.png"
+    image_path: "assets/icon_full_bleed.png"
