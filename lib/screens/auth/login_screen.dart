@@ -7,6 +7,7 @@ import 'verify_email_gate_screen.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../widgets/link_google_account_dialog.dart';
 import '../../services/connectivity_service.dart';
+import '../../utils/network_guard.dart';
 import '../main_navigation_screen.dart';
 
 const kDeepPurple = Color(0xFF4A148C);
@@ -104,6 +105,21 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    // Catches "registered on the network but no data bundle" fast (a few
+    // seconds) rather than letting the real sign-in call hang or fail
+    // with a confusing generic error later.
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
     try {
       final user = await _authService.signIn(
         email: _emailController.text.trim(),
@@ -173,6 +189,24 @@ class _LoginScreenState extends State<LoginScreen> {
       _isGoogleLoading = true;
       _errorMessage = null;
     });
+    // Check BEFORE opening the native Google account picker — this is
+    // what was causing the picker to pop up, let the user choose an
+    // account, then immediately bail with a confusing native error when
+    // data was exhausted. Catching it here means we never open the
+    // picker at all in that case, and show a message that actually
+    // explains what happened.
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        setState(() => _isGoogleLoading = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
     try {
       final userCred = await _authService.signInWithGoogle();
 
@@ -225,6 +259,16 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     } catch (e) {
       if (!mounted) return;
+
+      if (e is NetworkTimeoutException || e is NetworkUnavailableException) {
+        AppSnackbar.show(
+          context,
+          message: e.toString(),
+          type: AppMessageType.error,
+        );
+        setState(() => _isGoogleLoading = false);
+        return;
+      }
 
       final msg = e.toString().toLowerCase();
       // Cancelled - show NOTHING
@@ -516,6 +560,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             ),
+
+                            // Small caption under the buttons so it's
+                            // obvious the app is still working and not
+                            // frozen, however long the check ends up
+                            // taking.
+                            if (_isLoading || _isGoogleLoading)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: Center(
+                                  child: Text(
+                                    'Please wait, checking your connection…',
+                                    style: TextStyle(
+                                      color: kDeepPurple.withValues(alpha: 0.7),
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),

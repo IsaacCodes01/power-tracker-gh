@@ -7,6 +7,8 @@ import '../main_navigation_screen.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../widgets/notification_bell.dart';
 import '../../models/notification_item.dart';
+import '../../utils/network_guard.dart';
+import '../../services/connectivity_service.dart';
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -21,6 +23,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  final _connectivityService = ConnectivityService();
 
   String? _selectedAreaName;
   double? _selectedLatitude;
@@ -87,6 +90,31 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
 
     setState(() => _isSubmitting = true);
 
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
+
     final newReport = OutageReport(
       id: '',
       reporterId: currentUser.uid,
@@ -148,9 +176,13 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final message =
+          (e is NetworkTimeoutException || e is NetworkUnavailableException)
+          ? e.toString()
+          : 'Failed to submit report: $e';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to submit report: $e')));
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -301,6 +333,19 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                         : const Text('Submit Report'),
                   ),
                 ),
+                if (_isSubmitting)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Center(
+                      child: Text(
+                        'Please wait, checking your connection…',
+                        style: TextStyle(
+                          color: Colors.deepPurple.withValues(alpha: 0.7),
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

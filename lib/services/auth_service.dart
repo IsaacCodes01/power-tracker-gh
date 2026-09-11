@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
+import '../utils/network_guard.dart';
 
 // Thrown by signInWithGoogle() when the Google email already belongs to
 // an account created with a different sign-in method (almost always
@@ -11,8 +12,10 @@ class AccountExistsException implements Exception {
   final String email;
   final AuthCredential pendingCredential;
 
-  AccountExistsException(
-      {required this.email, required this.pendingCredential});
+  AccountExistsException({
+    required this.email,
+    required this.pendingCredential,
+  });
 }
 
 class AuthService {
@@ -38,18 +41,15 @@ class AuthService {
     String? phoneNumber,
   }) async {
     try {
-      final credential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final credential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password)
+          .withNetworkTimeout();
 
       final user = credential.user;
       if (user != null) {
         final trimmedFullName = fullName.trim();
         final firstName = trimmedFullName.isNotEmpty
-            ? trimmedFullName
-            .split(' ')
-            .first
+            ? trimmedFullName.split(' ').first
             : '';
 
         // ADDED: keep Firebase Auth's own displayName in sync too, so it
@@ -104,10 +104,9 @@ class AuthService {
     required String password,
   }) async {
     try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final credential = await _auth
+          .signInWithEmailAndPassword(email: email, password: password)
+          .withNetworkTimeout();
       return credential.user;
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
@@ -234,6 +233,8 @@ class AuthService {
       case 'wrong-password':
       case 'invalid-credential':
         return 'Incorrect email or password.';
+      case 'network-request-failed':
+        return const NetworkUnavailableException().toString();
       default:
         return 'Something went wrong. Please try again.';
     }
@@ -256,7 +257,9 @@ class AuthService {
 
       UserCredential userCred;
       try {
-        userCred = await _auth.signInWithCredential(credential);
+        userCred = await _auth
+            .signInWithCredential(credential)
+            .withNetworkTimeout();
       } on FirebaseAuthException catch (e) {
         if (e.code == 'account-exists-with-different-credential') {
           // Same email already has an account under a different provider
@@ -267,6 +270,9 @@ class AuthService {
             email: e.email ?? googleUser.email,
             pendingCredential: credential,
           );
+        }
+        if (e.code == 'network-request-failed') {
+          throw const NetworkUnavailableException();
         }
         rethrow;
       }
@@ -279,13 +285,8 @@ class AuthService {
           .get();
       if (!doc.exists) {
         final displayName = userCred.user!.displayName ?? '';
-        final firstName = displayName
-            .trim()
-            .isNotEmpty
-            ? displayName
-            .trim()
-            .split(' ')
-            .first
+        final firstName = displayName.trim().isNotEmpty
+            ? displayName.trim().split(' ').first
             : '';
 
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
@@ -344,18 +345,16 @@ class AuthService {
       final linkedCred = await user.linkWithCredential(pendingCredential);
 
       final displayName =
-      (linkedCred.user?.displayName ?? user.displayName ?? '').trim();
+          (linkedCred.user?.displayName ?? user.displayName ?? '').trim();
       if (displayName.isNotEmpty) {
         final docRef = _firestore.collection('users').doc(user.uid);
         final doc = await docRef.get();
-        final existingFullName =
-        (doc.data()?['fullName'] as String? ?? '').trim();
+        final existingFullName = (doc.data()?['fullName'] as String? ?? '')
+            .trim();
         if (existingFullName.isEmpty) {
           await docRef.update({
             'fullName': displayName,
-            'firstName': displayName
-                .split(' ')
-                .first,
+            'firstName': displayName.split(' ').first,
           });
         }
       }

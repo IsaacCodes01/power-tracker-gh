@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/outage_report.dart';
-import '../models/app_user.dart'; // ADDED: Import your user model
+import '../models/app_user.dart';
 import '../models/notification_item.dart';
+import '../utils/network_guard.dart';
 
 class FirestoreService {
   final CollectionReference _reportsRef = FirebaseFirestore.instance.collection(
@@ -11,7 +12,7 @@ class FirestoreService {
 
   // CREATE: files a new form into the cabinet.
   Future<void> createReport(OutageReport report) async {
-    await _reportsRef.add(report.toMap());
+    await _reportsRef.add(report.toMap()).withNetworkTimeout();
   }
 
   Future<void> updateNotificationPreferences(
