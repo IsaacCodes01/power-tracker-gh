@@ -38,6 +38,8 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
   // distinct marker so it's obvious at a glance which pin is "what you
   // searched for" versus the outage report pins already on the map.
   LatLng? _searchedLocation;
+  String? _searchedLocationName;
+  bool _showLocationInfoBar = false;
 
   // Created once here instead of inline in build() — recreating the
   // stream on every rebuild (search, map movement, anything that calls
@@ -149,15 +151,19 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
     final lon = double.tryParse(item['lon']?.toString() ?? '');
     if (lat == null || lon == null) return;
 
+    _searchDebounce?.cancel();
     FocusScope.of(context).unfocus();
-    _searchController.text = _locationService.shortenLocationName(
+    final name = _locationService.shortenLocationName(
       item['display_name'] ?? '',
     );
+    _searchController.text = name;
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
       _searchedLocation = LatLng(lat, lon);
+      _searchedLocationName = name;
       _searchError = null;
+      _showLocationInfoBar = false;
     });
     _mapController.move(LatLng(lat, lon), 15);
   }
@@ -165,6 +171,19 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
   Future<void> _handleSearch() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+
+    // Cancel any pending live-suggestions lookup from the last
+    // keystroke — without this, hitting "Done" right after typing left
+    // that debounced request still in flight, firing a SECOND Nominatim
+    // call moments after this one. Two near-simultaneous requests can
+    // trip Nominatim's rate limit, causing a confusing timeout on the
+    // leftover request even though the search you actually see already
+    // succeeded.
+    _searchDebounce?.cancel();
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+    });
 
     final hasConnection = await _connectivityService.hasConnection();
     if (!hasConnection) {
@@ -207,7 +226,9 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
         _mapController.move(target, 14);
         setState(() {
           _searchedLocation = target;
+          _searchedLocationName = query;
           _showSuggestions = false;
+          _showLocationInfoBar = false;
         });
       } else {
         setState(() => _searchError = 'Area not found. Try a different name.');
@@ -428,14 +449,16 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                           point: _searchedLocation!,
                           width: 50,
                           height: 50,
-                          child: const Icon(
-                            Icons.location_pin,
-                            color: Colors.deepPurple,
-                            size: 50,
-                            shadows: [
-                              Shadow(color: Colors.white, blurRadius: 3),
-                              Shadow(color: Colors.white, blurRadius: 3),
-                            ],
+                          child: GestureDetector(
+                            onTap: () => setState(
+                              () =>
+                                  _showLocationInfoBar = !_showLocationInfoBar,
+                            ),
+                            child: const Icon(
+                              Icons.location_pin,
+                              color: Colors.deepPurple,
+                              size: 50,
+                            ),
                           ),
                         ),
                       ],
@@ -445,11 +468,65 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
 
               // FIXED SEARCH BAR
               Positioned(
-                top: widget.focusLatitude != null ? 70 : 16,
+                top: 16,
                 left: 16,
                 right: 16,
                 child: Column(
                   children: [
+                    // Tap the purple search-result pin to toggle this —
+                    // a quick way to see the exact area name without
+                    // having to remember what you typed or re-open the
+                    // search box.
+                    if (_showLocationInfoBar && _searchedLocationName != null)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.location_pin,
+                              color: Colors.deepPurple,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _searchedLocationName!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _showLocationInfoBar = false),
+                              child: Icon(
+                                Icons.close,
+                                size: 18,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -555,22 +632,6 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                   ],
                 ),
               ),
-
-              // BACK BUTTON — only shown when this screen was pushed
-              // directly (e.g. from "View on map"), since in that case
-              // there's no bottom nav bar to rely on for navigation.
-              if (widget.focusLatitude != null)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.white,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ),
             ],
           );
         },
