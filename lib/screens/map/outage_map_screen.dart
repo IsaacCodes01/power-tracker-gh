@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/firestore_service.dart';
@@ -7,6 +8,7 @@ import '../../models/outage_report.dart';
 import '../outage/outage_detail_screen.dart';
 import '../../services/connectivity_service.dart';
 import '../../widgets/app_snackbar.dart';
+import '../../utils/network_guard.dart';
 
 class OutageMapScreen extends StatefulWidget {
   final double? focusLatitude;
@@ -22,13 +24,67 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
   final _mapController = MapController();
   final _locationService = LocationService();
   final _searchController = TextEditingController();
+  final _firestoreService = FirestoreService();
 
   bool _isSearching = false;
   String? _searchError;
 
+  // Live suggestions as the user types, same behaviour as
+  // location_search_screen.dart's picker in the report flow.
+  List<dynamic> _suggestions = [];
+  bool _showSuggestions = false;
+
+  // Where the last search actually landed — rendered as its own
+  // distinct marker so it's obvious at a glance which pin is "what you
+  // searched for" versus the outage report pins already on the map.
+  LatLng? _searchedLocation;
+
+  // Created once here instead of inline in build() — recreating the
+  // stream on every rebuild (search, map movement, anything that calls
+  // setState) was making StreamBuilder drop back to
+  // ConnectionState.waiting repeatedly, the same flicker bug Home had.
+  late Stream<List<OutageReport>> _reportsStream;
+
+  // Same stream-hang detection as Home: if the first snapshot hasn't
+  // arrived within a few seconds, swap the spinner for a "taking a
+  // while" state with a manual retry instead of spinning forever.
+  bool _reportsTookTooLong = false;
+  Timer? _reportsHangTimer;
+
+  void _startReportsHangTimer() {
+    _reportsHangTimer?.cancel();
+    _reportsHangTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => _reportsTookTooLong = true);
+    });
+  }
+
+  void _retryReportsStream() {
+    setState(() {
+      _reportsStream = _firestoreService.streamReports();
+      _reportsTookTooLong = false;
+    });
+    _startReportsHangTimer();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _reportsStream = _firestoreService.streamReports();
+    _startReportsHangTimer();
+  }
+
+  // Same debounce as location_search_screen.dart — waits for a pause in
+  // typing before actually calling Nominatim, since firing one request
+  // per keystroke can trip its ~1 request/second rate limit and cause
+  // an area that genuinely exists to silently come back as "no
+  // suggestions" purely because of timing, not because it's missing.
+  Timer? _searchDebounce;
+
   @override
   void dispose() {
     _searchController.dispose();
+    _reportsHangTimer?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -46,6 +102,65 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
   }
 
   final _connectivityService = ConnectivityService();
+
+  // Fires immediately on every keystroke to clear/gate the dropdown,
+  // but the actual Nominatim call is debounced (see _fetchSuggestions)
+  // instead of firing on every keystroke — same reasoning as
+  // location_search_screen.dart. 300ms feels like the sweet spot
+  // between "actually protects the rate limit" and "doesn't feel
+  // laggy" — the spinner shows immediately too, so the wait doesn't
+  // feel like dead silence even though results take a brief moment.
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    if (query.trim().length < 3) {
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+        _isSearching = false;
+      });
+      return;
+    }
+    setState(() => _isSearching = true);
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      _fetchSuggestions(query);
+    });
+  }
+
+  Future<void> _fetchSuggestions(String query) async {
+    try {
+      final results = await _locationService.searchAreas(query);
+      if (!mounted) return;
+      setState(() {
+        _suggestions = results;
+        _showSuggestions = results.isNotEmpty;
+      });
+    } catch (_) {
+      // Live suggestions are a nicety — if one lookup fails (a blip, a
+      // timeout), just don't show a dropdown for it. The explicit
+      // search button below still works and reports a proper error if
+      // the user submits while genuinely offline.
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  void _selectSuggestion(dynamic item) {
+    final lat = double.tryParse(item['lat']?.toString() ?? '');
+    final lon = double.tryParse(item['lon']?.toString() ?? '');
+    if (lat == null || lon == null) return;
+
+    FocusScope.of(context).unfocus();
+    _searchController.text = _locationService.shortenLocationName(
+      item['display_name'] ?? '',
+    );
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+      _searchedLocation = LatLng(lat, lon);
+      _searchError = null;
+    });
+    _mapController.move(LatLng(lat, lon), 15);
+  }
 
   Future<void> _handleSearch() async {
     final query = _searchController.text.trim();
@@ -68,15 +183,45 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
       _searchError = null;
     });
 
-    final coordinates = await _locationService.getCoordinatesFromArea(query);
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        setState(() => _isSearching = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
 
-    if (coordinates != null) {
-      _mapController.move(
-        LatLng(coordinates['latitude']!, coordinates['longitude']!),
-        14,
-      );
-    } else {
-      setState(() => _searchError = 'Area not found. Try a different name.');
+    try {
+      final coordinates = await _locationService.getCoordinatesFromArea(query);
+
+      if (coordinates != null) {
+        final target = LatLng(
+          coordinates['latitude']!,
+          coordinates['longitude']!,
+        );
+        _mapController.move(target, 14);
+        setState(() {
+          _searchedLocation = target;
+          _showSuggestions = false;
+        });
+      } else {
+        setState(() => _searchError = 'Area not found. Try a different name.');
+      }
+    } catch (e) {
+      // A network timeout/failure here is NOT the same as "area not
+      // found" — say so, instead of implying Nominatim doesn't know the
+      // place when the real problem was the connection.
+      setState(() {
+        _searchError =
+            (e is NetworkTimeoutException || e is NetworkUnavailableException)
+            ? e.toString()
+            : 'Search failed. Please try again.';
+      });
     }
 
     if (mounted) setState(() => _isSearching = false);
@@ -156,7 +301,6 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final firestoreService = FirestoreService();
     final defaultCenter = LatLng(5.6037, -0.1870);
 
     // If this screen was opened with a specific report's coordinates
@@ -169,12 +313,62 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: const Text('Outage Map'),
+        backgroundColor: Colors.deepPurple,
+        elevation: 0,
+        foregroundColor: Colors.white,
+      ),
       body: StreamBuilder<List<OutageReport>>(
-        stream: firestoreService.streamReports(),
+        stream: _reportsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
+            if (_reportsTookTooLong) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.wifi_off_rounded,
+                        size: 48,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'This is taking longer than expected',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Please check your data balance or connection, '
+                        'then try again.',
+                        style: TextStyle(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _retryReportsStream,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
             return const Center(child: CircularProgressIndicator());
           }
+          _reportsHangTimer?.cancel();
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
@@ -222,6 +416,30 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                       );
                     }).toList(),
                   ),
+                  // The searched-for location, drawn as its own layer so
+                  // it's unmistakably "what you searched" rather than an
+                  // outage report — deep purple isn't used by any status
+                  // colour, and it's bigger with a white outline so it
+                  // stands out even sitting right next to report pins.
+                  if (_searchedLocation != null)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _searchedLocation!,
+                          width: 50,
+                          height: 50,
+                          child: const Icon(
+                            Icons.location_pin,
+                            color: Colors.deepPurple,
+                            size: 50,
+                            shadows: [
+                              Shadow(color: Colors.white, blurRadius: 3),
+                              Shadow(color: Colors.white, blurRadius: 3),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
 
@@ -246,6 +464,7 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
+                        onChanged: _onSearchChanged,
                         onSubmitted: (_) => _handleSearch(),
                         decoration: InputDecoration(
                           hintText: 'Search an area on the map...',
@@ -275,6 +494,45 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                         ),
                       ),
                     ),
+                    if (_showSuggestions)
+                      Container(
+                        margin: const EdgeInsets.only(top: 6),
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(25),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          itemCount: _suggestions.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = _suggestions[index];
+                            return ListTile(
+                              dense: true,
+                              leading: const Icon(
+                                Icons.location_on_outlined,
+                                color: Colors.deepPurple,
+                              ),
+                              title: Text(
+                                item['display_name'] ?? 'Unknown area',
+                                style: const TextStyle(fontSize: 13.5),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _selectSuggestion(item),
+                            );
+                          },
+                        ),
+                      ),
                     if (_searchError != null)
                       Container(
                         margin: const EdgeInsets.only(top: 6),

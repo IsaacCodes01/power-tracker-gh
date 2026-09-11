@@ -1,39 +1,42 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import '../utils/network_guard.dart';
 
 class LocationService {
+  // Shared by both the live-suggestions dropdown and the plain
+  // single-result search below, so there's one place that knows how to
+  // talk to Nominatim instead of two copies drifting apart.
+  Future<List<dynamic>> searchAreas(String query, {int limit = 8}) async {
+    final encoded = Uri.encodeComponent('$query, Ghana');
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?q=$encoded&format=json&limit=$limit',
+    );
+
+    final response = await http
+        .get(url, headers: {'User-Agent': 'PowerTrackerGH/1.0'})
+        .withNetworkTimeout(duration: const Duration(seconds: 8));
+
+    if (response.statusCode != 200 || response.body.isEmpty) return [];
+
+    try {
+      final results = jsonDecode(response.body);
+      return results is List ? results : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   // Asks Nominatim (OpenStreetMap's free geocoding service) to convert
   // a typed area name into real latitude/longitude coordinates.
   Future<Map<String, double>?> getCoordinatesFromArea(String area) async {
-    final query = Uri.encodeComponent('$area, Ghana');
-    final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1',
-    );
-
-    try {
-      final response = await http
-          .get(url, headers: {'User-Agent': 'PowerTrackerGH/1.0'})
-          .timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final results = jsonDecode(response.body);
-
-        if (results is List && results.isNotEmpty) {
-          final Map<String, dynamic> firstRecord = results[0];
-          return {
-            'latitude': double.parse(firstRecord['lat'] ?? '0.0'),
-            'longitude': double.parse(firstRecord['lon'] ?? '0.0'),
-          };
-        }
-      }
-    } catch (e) {
-      // If geocoding fails (no internet, area not found, etc.),
-      // we return null and let the caller decide what to do.
-      return null;
-    }
-
-    return null;
+    final results = await searchAreas(area, limit: 1);
+    if (results.isEmpty) return null;
+    final Map<String, dynamic> firstRecord = results[0];
+    return {
+      'latitude': double.parse(firstRecord['lat'] ?? '0.0'),
+      'longitude': double.parse(firstRecord['lon'] ?? '0.0'),
+    };
   }
 
   // Gets the device's real current GPS position, handling permission
@@ -71,12 +74,14 @@ class LocationService {
     try {
       final response = await http
           .get(url, headers: {'User-Agent': 'PowerTrackerGH/1.0'})
-          .timeout(const Duration(seconds: 5));
+          .withNetworkTimeout(duration: const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['display_name'];
       }
+    } on NetworkTimeoutException {
+      rethrow;
     } catch (e) {
       return null;
     }

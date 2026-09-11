@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../services/location_service.dart';
@@ -17,13 +18,39 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
   List<dynamic> _results = [];
   bool _isSearching = false;
 
+  // Waits for a pause in typing before actually calling Nominatim,
+  // instead of firing one request per keystroke — Nominatim's free API
+  // is limited to ~1 request/second and can silently rate-limit or drop
+  // requests that come in faster than that, which looked like "this
+  // area just isn't found" even though it genuinely exists.
+  Timer? _debounce;
+
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
   final _connectivityService = ConnectivityService();
+
+  void _onChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().length < 3) {
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
+      return;
+    }
+    // Show the spinner immediately, not just once the network call
+    // starts — there's a real 300ms gap before the debounced request
+    // actually fires, and leaving that silent feels laggier than it is.
+    setState(() => _isSearching = true);
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _search(query);
+    });
+  }
 
   Future<void> _search(String query) async {
     if (query.trim().length < 3) {
@@ -84,7 +111,7 @@ class _LocationSearchScreenState extends State<LocationSearchScreen> {
             TextField(
               controller: _searchController,
               autofocus: true,
-              onChanged: _search,
+              onChanged: _onChanged,
               decoration: InputDecoration(
                 hintText: 'Search for an area...',
                 prefixIcon: const Icon(Icons.search),
