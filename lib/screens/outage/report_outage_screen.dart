@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
@@ -9,6 +10,7 @@ import '../../widgets/notification_bell.dart';
 import '../../models/notification_item.dart';
 import '../../utils/network_guard.dart';
 import '../../services/connectivity_service.dart';
+import '../auth/signup_screen.dart' show purpleButtonStyle;
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -34,9 +36,48 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
   OutageSeverity _selectedSeverity = OutageSeverity.minor;
   bool _isSubmitting = false;
 
+  // Three-stage caption while submitting: starts reassuring ("Submitting
+  // report…"), only escalates to mentioning delay/connection if it's
+  // genuinely taking a while — so a normal, fast submit just shows
+  // "Submitting report…" the whole time and nothing more alarming.
+  int _submitStage = 0; // 0 = submitting, 1 = slow, 2 = checking connection
+  Timer? _slowTimer;
+  Timer? _checkingTimer;
+
+  String get _submitStageText {
+    switch (_submitStage) {
+      case 1:
+        return 'This is taking longer than expected…';
+      case 2:
+        return 'Checking your connection…';
+      default:
+        return 'Submitting report…';
+    }
+  }
+
+  void _startSubmitStageTimers() {
+    _slowTimer?.cancel();
+    _checkingTimer?.cancel();
+    _submitStage = 0;
+    _slowTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _submitStage = 1);
+    });
+    _checkingTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _submitStage = 2);
+    });
+  }
+
+  void _resetSubmitStage() {
+    _slowTimer?.cancel();
+    _checkingTimer?.cancel();
+    _submitStage = 0;
+  }
+
   @override
   void dispose() {
     _descriptionController.dispose();
+    _slowTimer?.cancel();
+    _checkingTimer?.cancel();
     super.dispose();
   }
 
@@ -89,10 +130,12 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
     }
 
     setState(() => _isSubmitting = true);
+    _startSubmitStageTimers();
 
     final hasConnection = await _connectivityService.hasConnection();
     if (!hasConnection) {
       if (mounted) {
+        _resetSubmitStage();
         setState(() => _isSubmitting = false);
         AppSnackbar.show(
           context,
@@ -105,6 +148,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
     final hasRealAccess = await _connectivityService.hasRealInternetAccess();
     if (!hasRealAccess) {
       if (mounted) {
+        _resetSubmitStage();
         setState(() => _isSubmitting = false);
         AppSnackbar.show(
           context,
@@ -184,6 +228,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
+      _resetSubmitStage();
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
@@ -207,10 +252,14 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 InkWell(
                   onTap: _pickLocation,
                   child: InputDecorator(
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Area / Location',
-                      border: OutlineInputBorder(),
-                      suffixIcon: Icon(Icons.chevron_right),
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(
+                        Icons.location_on,
+                        color: Colors.deepPurple,
+                      ),
+                      suffixIcon: const Icon(Icons.chevron_right),
                     ),
                     child: Text(
                       _selectedAreaName ?? 'Tap to select a location',
@@ -230,18 +279,34 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 ),
                 const SizedBox(height: 8),
                 SegmentedButton<OutageSeverity>(
-                  segments: const [
+                  showSelectedIcon: false,
+                  segments: [
                     ButtonSegment(
                       value: OutageSeverity.minor,
-                      label: Text('Minor'),
+                      label: const Text('Minor'),
+                      icon: Icon(
+                        Icons.circle,
+                        size: 10,
+                        color: severityColor(OutageSeverity.minor),
+                      ),
                     ),
                     ButtonSegment(
                       value: OutageSeverity.moderate,
-                      label: Text('Moderate'),
+                      label: const Text('Moderate'),
+                      icon: Icon(
+                        Icons.circle,
+                        size: 10,
+                        color: severityColor(OutageSeverity.moderate),
+                      ),
                     ),
                     ButtonSegment(
                       value: OutageSeverity.major,
-                      label: Text('Major'),
+                      label: const Text('Major'),
+                      icon: Icon(
+                        Icons.circle,
+                        size: 10,
+                        color: severityColor(OutageSeverity.major),
+                      ),
                     ),
                   ],
                   selected: {_selectedSeverity},
@@ -264,7 +329,17 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                   items: OutageType.values.map((type) {
                     return DropdownMenuItem(
                       value: type,
-                      child: Text(outageTypeLabel(type)),
+                      child: Row(
+                        children: [
+                          Icon(
+                            outageTypeIcon(type),
+                            size: 18,
+                            color: Colors.deepPurple,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(outageTypeLabel(type)),
+                        ],
+                      ),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -283,6 +358,13 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     hintText: 'What happened? When did it start?',
                     border: OutlineInputBorder(),
                     alignLabelWithHint: true,
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(bottom: 60),
+                      child: Icon(
+                        Icons.description_outlined,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -300,20 +382,31 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 const SizedBox(height: 8),
                 InkWell(
                   onTap: _pickTime,
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 14,
                     ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[400]!),
+                      color: Colors.deepPurple.withValues(alpha: 0.04),
+                      border: Border.all(
+                        color: Colors.deepPurple.withValues(alpha: 0.3),
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.access_time, size: 18),
+                        const Icon(
+                          Icons.access_time,
+                          size: 18,
+                          color: Colors.deepPurple,
+                        ),
                         const SizedBox(width: 10),
-                        Text(_selectedTime.format(context)),
+                        Text(
+                          _selectedTime.format(context),
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
                       ],
                     ),
                   ),
@@ -323,12 +416,18 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
+                    style: purpleButtonStyle(),
                     onPressed: _isSubmitting ? null : _handleSubmit,
                     child: _isSubmitting
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
                           )
                         : const Text('Submit Report'),
                   ),
@@ -338,7 +437,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                     padding: const EdgeInsets.only(top: 10),
                     child: Center(
                       child: Text(
-                        'Please wait, checking your connection…',
+                        _submitStageText,
                         style: TextStyle(
                           color: Colors.deepPurple.withValues(alpha: 0.7),
                           fontSize: 12.5,
