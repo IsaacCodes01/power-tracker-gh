@@ -128,7 +128,7 @@ class AuthService {
     if (user.emailVerified) {
       throw 'Your email is already verified.';
     }
-    await user.sendEmailVerification();
+    await user.sendEmailVerification().withNetworkTimeout();
   }
 
   // ADDED: resend the verification email when the user is signed OUT —
@@ -157,14 +157,14 @@ class AuthService {
   Future<bool> reloadAndCheckVerified() async {
     final user = _auth.currentUser;
     if (user == null) return false;
-    await user.reload();
+    await user.reload().withNetworkTimeout();
     return _auth.currentUser?.emailVerified ?? false;
   }
 
   // PASSWORD RESET: sends a reset link to the user's email via Firebase.
   Future<void> resetPassword(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _auth.sendPasswordResetEmail(email: email).withNetworkTimeout();
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
     }

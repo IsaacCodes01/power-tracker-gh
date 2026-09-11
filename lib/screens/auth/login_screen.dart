@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import '../../services/auth_service.dart';
 import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
@@ -81,10 +82,31 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   bool _obscurePassword = true;
 
+  // Drives the staged "Please wait" -> "Please wait, checking your
+  // connection..." caption. Starts false so a fast, healthy request
+  // never shows the connection-specific wording at all — only requests
+  // that are genuinely still going after a couple seconds escalate to it.
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _waitMessageTimer?.cancel();
     super.dispose();
   }
 
@@ -105,12 +127,14 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    _startWaitMessageTimer();
     // Catches "registered on the network but no data bundle" fast (a few
     // seconds) rather than letting the real sign-in call hang or fail
     // with a confusing generic error later.
     final hasRealAccess = await _connectivityService.hasRealInternetAccess();
     if (!hasRealAccess) {
       if (mounted) {
+        _resetWaitMessage();
         setState(() => _isLoading = false);
         AppSnackbar.show(
           context,
@@ -169,6 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = e.toString();
       });
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -189,6 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isGoogleLoading = true;
       _errorMessage = null;
     });
+    _startWaitMessageTimer();
     // Check BEFORE opening the native Google account picker — this is
     // what was causing the picker to pop up, let the user choose an
     // account, then immediately bail with a confusing native error when
@@ -198,6 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final hasRealAccess = await _connectivityService.hasRealInternetAccess();
     if (!hasRealAccess) {
       if (mounted) {
+        _resetWaitMessage();
         setState(() => _isGoogleLoading = false);
         AppSnackbar.show(
           context,
@@ -287,6 +314,7 @@ class _LoginScreenState extends State<LoginScreen> {
         type: AppMessageType.error,
       );
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
@@ -563,14 +591,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             // Small caption under the buttons so it's
                             // obvious the app is still working and not
-                            // frozen, however long the check ends up
-                            // taking.
+                            // frozen. Starts plain, and only escalates to
+                            // mentioning the connection after ~2s — so a
+                            // normal, fast sign-in never flashes wording
+                            // that implies something's wrong.
                             if (_isLoading || _isGoogleLoading)
                               Padding(
                                 padding: const EdgeInsets.only(top: 10),
                                 child: Center(
                                   child: Text(
-                                    'Please wait, checking your connection…',
+                                    _showConnectionMessage
+                                        ? 'Please wait, checking your connection…'
+                                        : 'Please wait…',
                                     style: TextStyle(
                                       color: kDeepPurple.withValues(alpha: 0.7),
                                       fontSize: 12.5,

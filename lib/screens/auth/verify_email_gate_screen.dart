@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/auth_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../utils/network_guard.dart';
 import '../../widgets/app_snackbar.dart';
 import '../main_navigation_screen.dart';
 import 'login_screen.dart' show LoginScreen;
@@ -22,8 +25,28 @@ class VerifyEmailGateScreen extends StatefulWidget {
 
 class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
   final _authService = AuthService();
+  final _connectivityService = ConnectivityService();
   bool _isSending = false;
   bool _isChecking = false;
+
+  // Staged wait message, same pattern as login/signup — used on the
+  // main "I've verified" button, which has room to show it. The
+  // resend-inside-dialog button stays compact instead.
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
 
   @override
   void initState() {
@@ -36,8 +59,36 @@ class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _waitMessageTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _resend() async {
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'No internet connection.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
     setState(() => _isSending = true);
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
     try {
       await _authService.sendEmailVerification();
       if (!mounted) return;
@@ -59,7 +110,31 @@ class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
   }
 
   Future<void> _checkVerified() async {
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'No internet connection.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
     setState(() => _isChecking = true);
+    _startWaitMessageTimer();
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        _resetWaitMessage();
+        setState(() => _isChecking = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
     try {
       final verified = await _authService.reloadAndCheckVerified();
       if (!mounted) return;
@@ -79,7 +154,17 @@ class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
           type: AppMessageType.info,
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: e is NetworkTimeoutException
+            ? e.toString()
+            : 'Unable to check right now. Please try again.',
+        type: AppMessageType.error,
+      );
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isChecking = false);
     }
   }
@@ -211,6 +296,19 @@ class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
                           : const Text("I've verified — Continue"),
                     ),
                   ),
+                  if (_isChecking)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        _showConnectionMessage
+                            ? 'Please wait, checking your connection…'
+                            : 'Please wait…',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: _isSending ? null : _resend,

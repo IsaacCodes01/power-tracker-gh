@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/auth_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../utils/network_guard.dart';
 import '../../widgets/app_snackbar.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -13,37 +16,84 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _authService = AuthService();
+  final _connectivityService = ConnectivityService();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _emailSent = false;
 
+  // Same staged "Please wait" -> "Please wait, checking your
+  // connection..." pattern used on login/signup.
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
+    _waitMessageTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _handleReset() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'No internet connection. Please check your network.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+    _startWaitMessageTimer();
+
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        _resetWaitMessage();
+        setState(() => _isLoading = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
 
     try {
       await _authService.resetPassword(_emailController.text.trim());
       setState(() => _emailSent = true);
     } catch (e) {
       if (!mounted) return;
-      AppSnackbar.show(
-        context,
-        message: 'Failed to send link: $e',
-        type: AppMessageType.error,
-      );
+      final message =
+          (e is NetworkTimeoutException || e is NetworkUnavailableException)
+          ? e.toString()
+          : 'Failed to send link: $e';
+      AppSnackbar.show(context, message: message, type: AppMessageType.error);
       setState(() => _errorMessage = e.toString());
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -117,6 +167,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           : const Text('Send Reset Link'),
                     ),
                   ),
+                  if (_isLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Center(
+                        child: Text(
+                          _showConnectionMessage
+                              ? 'Please wait, checking your connection…'
+                              : 'Please wait…',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ],
             ),

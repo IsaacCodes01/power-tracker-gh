@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/app_snackbar.dart';
@@ -78,6 +79,26 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  // Same staged "Please wait" -> "Please wait, checking your
+  // connection..." pattern as the login screen — plain wording for a
+  // normal-speed request, only escalates after a couple seconds if
+  // something's genuinely taking a while.
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _waitMessageTimer?.cancel();
     super.dispose();
   }
 
@@ -114,12 +136,14 @@ class _SignupScreenState extends State<SignupScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
+    _startWaitMessageTimer();
     // Same fast "out of data bundle" check as login — catches it in a
     // few seconds instead of letting account creation hang or fail with
     // a generic error later.
     final hasRealAccess = await _connectivityService.hasRealInternetAccess();
     if (!hasRealAccess) {
       if (mounted) {
+        _resetWaitMessage();
         setState(() => _isLoading = false);
         AppSnackbar.show(
           context,
@@ -165,6 +189,7 @@ class _SignupScreenState extends State<SignupScreen> {
       }
       if (mounted) setState(() => _errorMessage = displayError);
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -473,7 +498,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                 padding: const EdgeInsets.only(top: 10),
                                 child: Center(
                                   child: Text(
-                                    'Please wait, checking your connection…',
+                                    _showConnectionMessage
+                                        ? 'Please wait, checking your connection…'
+                                        : 'Please wait…',
                                     style: TextStyle(
                                       color: kDeepPurple.withValues(alpha: 0.7),
                                       fontSize: 12.5,
