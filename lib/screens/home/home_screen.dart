@@ -48,15 +48,48 @@ class _HomeScreenState extends State<HomeScreen> {
   // stream on every build was causing StreamBuilder to drop back to
   // ConnectionState.waiting repeatedly, which was the screen "blink".
   final _firestoreService = FirestoreService();
-  late final Stream<List<OutageReport>> _reportsStream;
+  late Stream<List<OutageReport>> _reportsStream;
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _userStream;
   Stream<List<NotificationItem>>? _notifStream;
+
+  // If the very first snapshot on _reportsStream hasn't arrived within
+  // this window, swap the infinite spinner for a "taking a while, check
+  // your connection" state with a manual retry — instead of leaving
+  // someone staring at a spinner with no idea whether the app is broken
+  // or just waiting. Deliberately NOT using .timeout() here: Stream
+  // doesn't support it the way Future does, and even if it did, a
+  // Firestore snapshots() stream is meant to stay open indefinitely —
+  // we're not trying to kill it, just tell the user it's taking a while
+  // and give them a way to try again.
+  bool _reportsTookTooLong = false;
+  Timer? _reportsHangTimer;
+
+  void _startReportsHangTimer() {
+    _reportsHangTimer?.cancel();
+    _reportsHangTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => _reportsTookTooLong = true);
+    });
+  }
+
+  // Re-subscribes from scratch. Assigning a NEW Stream instance is what
+  // makes StreamBuilder drop back to ConnectionState.waiting and retry —
+  // normally something we avoid (that's what caused the old "blink" bug
+  // when it happened on every rebuild), but here it's exactly what we
+  // want, triggered once, deliberately, by the user tapping Retry.
+  void _retryReportsStream() {
+    setState(() {
+      _reportsStream = _firestoreService.streamReports();
+      _reportsTookTooLong = false;
+    });
+    _startReportsHangTimer();
+  }
 
   @override
   void initState() {
     super.initState();
 
     _reportsStream = _firestoreService.streamReports();
+    _startReportsHangTimer();
     final uid = AuthService().currentUser?.uid;
     if (uid != null) {
       _userStream = FirebaseFirestore.instance
@@ -157,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _activeLocController.dispose();
     _resolvedLocController.dispose();
     _announcementPageController.dispose();
+    _reportsHangTimer?.cancel();
     super.dispose();
   }
 
@@ -198,8 +232,54 @@ class _HomeScreenState extends State<HomeScreen> {
         stream: _reportsStream,
         builder: (context, reportSnap) {
           if (reportSnap.connectionState == ConnectionState.waiting) {
+            if (_reportsTookTooLong) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.wifi_off_rounded,
+                        size: 48,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'This is taking longer than expected',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Please check your data balance or connection, '
+                        'then try again.',
+                        style: TextStyle(color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: _retryReportsStream,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
             return const Center(child: CircularProgressIndicator());
           }
+          // Real data (or even an error) arrived — the hang timer's job
+          // is done, whether it already fired or not.
+          _reportsHangTimer?.cancel();
           if (reportSnap.hasError) {
             return Center(child: Text('Error: ${reportSnap.error}'));
           }
@@ -332,28 +412,64 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.deepPurple[50],
-                      child: const Icon(
-                        Icons.add_alert,
-                        color: Colors.deepPurple,
+                GestureDetector(
+                  onTap: widget.onNavigateToReport,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF4A148C), Color(0xFF7B1FA2)],
                       ),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    title: const Text(
-                      'File a New Report',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.add_alert,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'File a New Report',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Report a sudden blackout or transformer '
+                                'issue instantly',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.white70,
+                        ),
+                      ],
                     ),
-                    subtitle: const Text(
-                      'Report a sudden blackout or transformer issue instantly',
-                    ),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: widget.onNavigateToReport,
                   ),
                 ),
                 const SizedBox(height: 24),
