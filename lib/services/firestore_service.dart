@@ -22,6 +22,24 @@ class FirestoreService {
     await _usersRef.doc(uid).update(prefs);
   }
 
+  // ==========================================
+  //          PUSH NOTIFICATION (FCM) METHODS
+  // ==========================================
+
+  // Saves this device's FCM token to the user's profile so the
+  // sendPushOnNotification Cloud Function knows where to deliver pushes.
+  // Safe to call repeatedly (e.g. on every app start / token refresh) —
+  // just overwrites with whatever the current token is.
+  Future<void> saveFcmToken(String uid, String token) async {
+    await _usersRef.doc(uid).update({'fcmToken': token});
+  }
+
+  // Called on sign-out so a logged-out device stops receiving pushes
+  // meant for whoever's account it's signed into next.
+  Future<void> clearFcmToken(String uid) async {
+    await _usersRef.doc(uid).update({'fcmToken': FieldValue.delete()});
+  }
+
   // Writes a new notification for a specific user.
   Future<void> createNotification({
     required String userId,

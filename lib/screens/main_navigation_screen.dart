@@ -7,6 +7,7 @@ import 'admin/admin_dashboard_screen.dart';
 import '../services/auth_service.dart';
 import 'settings/settings_screen.dart';
 import '../services/connectivity_service.dart';
+import '../services/push_notification_service.dart';
 import 'dart:async';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -39,6 +40,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _checkInitialConnection();
     _connectivitySubscription = _connectivityService.onConnectivityChanged
         .listen(_handleConnectivityChange);
+
+    // Register this device for push notifications now that we know
+    // someone's actually signed in. Safe to call again on every app
+    // open — it just re-saves the current token.
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      PushNotificationService().registerForUser(uid);
+    }
   }
 
   @override

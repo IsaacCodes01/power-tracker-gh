@@ -115,6 +115,16 @@ class AuthService {
 
   // SIGN OUT
   Future<void> signOut() async {
+    // Best-effort: stop this device from receiving pushes for whoever
+    // signs in next. Never let a failure here block sign-out itself.
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+          'fcmToken': FieldValue.delete(),
+        });
+      }
+    } catch (_) {}
     await _auth.signOut();
   }
 
