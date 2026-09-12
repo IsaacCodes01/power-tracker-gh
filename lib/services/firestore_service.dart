@@ -191,7 +191,7 @@ class FirestoreService {
     String reportId,
     Map<String, dynamic> updates,
   ) async {
-    await _reportsRef.doc(reportId).update(updates);
+    await _reportsRef.doc(reportId).update(updates).withNetworkTimeout();
   }
 
   // DELETE: removes a form from the cabinet entirely.
@@ -204,7 +204,16 @@ class FirestoreService {
   Future<void> confirmOutage(String reportId, String userId) async {
     await _reportsRef.doc(reportId).update({
       'confirmedByUserIds': FieldValue.arrayUnion([userId]),
-    });
+    }).withNetworkTimeout();
+  }
+
+  // Records that this confirmer has answered the "is your light really
+  // back?" check — regardless of which way they answered — so the
+  // prompt stops showing for them once they've responded once.
+  Future<void> respondToRestorationCheck(String reportId, String userId) async {
+    await _reportsRef.doc(reportId).update({
+      'restorationCheckRespondedUserIds': FieldValue.arrayUnion([userId]),
+    }).withNetworkTimeout();
   }
 
   // Admin-only: stamps a report as officially verified.

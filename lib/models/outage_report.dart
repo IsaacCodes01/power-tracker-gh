@@ -80,6 +80,12 @@ class OutageReport {
   final bool verified;
   final DateTime createdAt;
 
+  // Confirmers who've already answered "is your light really back?" after
+  // this report was marked restored — regardless of which way they
+  // answered. Stops the prompt from being shown to them again once
+  // they've responded once.
+  final List<String> restorationCheckRespondedUserIds;
+
   OutageReport({
     required this.id,
     required this.reporterId,
@@ -96,7 +102,42 @@ class OutageReport {
     this.confirmedByUserIds = const [],
     this.verified = false,
     required this.createdAt,
+    this.restorationCheckRespondedUserIds = const [],
   });
+
+  // Returns a copy with only the given fields changed — everything else
+  // carries over automatically from the original. Safer than manually
+  // rebuilding the object field-by-field: a new field added to this
+  // class later is picked up here for free, instead of silently being
+  // missed in every hand-written copy scattered across the app.
+  OutageReport copyWith({
+    OutageStatus? status,
+    DateTime? endTime,
+    List<String>? confirmedByUserIds,
+    bool? verified,
+    List<String>? restorationCheckRespondedUserIds,
+  }) {
+    return OutageReport(
+      id: id,
+      reporterId: reporterId,
+      area: area,
+      latitude: latitude,
+      longitude: longitude,
+      startTime: startTime,
+      endTime: endTime ?? this.endTime,
+      status: status ?? this.status,
+      severity: severity,
+      outageType: outageType,
+      estimatedRestoration: estimatedRestoration,
+      description: description,
+      confirmedByUserIds: confirmedByUserIds ?? this.confirmedByUserIds,
+      verified: verified ?? this.verified,
+      createdAt: createdAt,
+      restorationCheckRespondedUserIds:
+          restorationCheckRespondedUserIds ??
+          this.restorationCheckRespondedUserIds,
+    );
+  }
 
   factory OutageReport.fromMap(String id, Map<String, dynamic> data) {
     return OutageReport(
@@ -128,6 +169,9 @@ class OutageReport {
       confirmedByUserIds: List<String>.from(data['confirmedByUserIds'] ?? []),
       verified: data['verified'] ?? false,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      restorationCheckRespondedUserIds: List<String>.from(
+        data['restorationCheckRespondedUserIds'] ?? [],
+      ),
     );
   }
 
@@ -149,6 +193,7 @@ class OutageReport {
       'confirmedByUserIds': confirmedByUserIds,
       'verified': verified,
       'createdAt': Timestamp.fromDate(createdAt),
+      'restorationCheckRespondedUserIds': restorationCheckRespondedUserIds,
     };
   }
 }
