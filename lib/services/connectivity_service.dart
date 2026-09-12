@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 
@@ -28,6 +29,17 @@ class ConnectivityService {
   Future<bool> hasRealInternetAccess({
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    // Browsers block this specific request via CORS — generate_204 is
+    // built for OS-level checks (like Android's own captive-portal
+    // detection), not for being called from inside a webpage, so Chrome
+    // refuses to let the response through at all. This check exists to
+    // catch "registered on the network but mobile data is exhausted,"
+    // which isn't a scenario that applies on web anyway — if the browser
+    // loaded the page, it's already online. Skip the probe here and let
+    // the real network calls' own error handling catch genuine failures,
+    // same as the second-layer fallback already does on mobile.
+    if (kIsWeb) return true;
+
     try {
       final response = await http
           .get(Uri.parse('https://www.gstatic.com/generate_204'))

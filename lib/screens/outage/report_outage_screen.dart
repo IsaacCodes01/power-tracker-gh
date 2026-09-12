@@ -280,13 +280,23 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 const SizedBox(height: 8),
                 SegmentedButton<OutageSeverity>(
                   showSelectedIcon: false,
+                  // Default padding/text size left just enough room for
+                  // two short labels but not three, with "Moderate"
+                  // being the one to overflow and wrap awkwardly.
+                  // Tightening both here fixes it at any phone width,
+                  // not just this one.
+                  style: SegmentedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    textStyle: const TextStyle(fontSize: 12.5),
+                  ),
                   segments: [
                     ButtonSegment(
                       value: OutageSeverity.minor,
                       label: const Text('Minor'),
                       icon: Icon(
                         Icons.circle,
-                        size: 10,
+                        size: 9,
                         color: severityColor(OutageSeverity.minor),
                       ),
                     ),
@@ -295,7 +305,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                       label: const Text('Moderate'),
                       icon: Icon(
                         Icons.circle,
-                        size: 10,
+                        size: 9,
                         color: severityColor(OutageSeverity.moderate),
                       ),
                     ),
@@ -304,7 +314,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                       label: const Text('Major'),
                       icon: Icon(
                         Icons.circle,
-                        size: 10,
+                        size: 9,
                         color: severityColor(OutageSeverity.major),
                       ),
                     ),
