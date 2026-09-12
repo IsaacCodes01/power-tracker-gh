@@ -12,10 +12,25 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Must be registered before runApp() — this is what lets a push wake
-  // the app up (or run a background isolate) while it's closed.
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await PushNotificationService().setup();
+  // Wrapped defensively: if push-notification setup fails or hangs on a
+  // particular device (permission quirks, a plugin channel issue, etc.),
+  // the whole app must not get stuck before runApp() ever fires. Worst
+  // case with this in place is "push notifications don't work on this
+  // device" — not "the app never opens at all."
+  try {
+    // Must be registered before runApp() — this is what lets a push wake
+    // the app up (or run a background isolate) while it's closed.
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    // A hard timeout as well as a try/catch: a catch alone doesn't help
+    // if setup() hangs rather than throwing — this guarantees main()
+    // always reaches runApp() one way or another.
+    await PushNotificationService().setup().timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (e, stackTrace) {
+    debugPrint('Push notification setup failed, continuing anyway: $e');
+    debugPrint('$stackTrace');
+  }
 
   runApp(const MyApp());
 }

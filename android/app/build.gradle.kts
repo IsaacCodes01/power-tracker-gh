@@ -15,6 +15,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications, which uses newer Java
+        // library features than older Android versions support natively.
+        // Desugaring lets those features work on all supported minSdk
+        // versions by rewriting the bytecode at build time.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -22,7 +27,9 @@ android {
         applicationId = "com.isaacotabil.powertrackergh"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // flutter_local_notifications requires minSdk 24+ — set explicitly
+        // rather than relying on Flutter's own default, which may be lower.
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -45,4 +52,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Required alongside isCoreLibraryDesugaringEnabled above —
+    // flutter_local_notifications needs this specific library present to
+    // actually use the newer Java APIs it depends on.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

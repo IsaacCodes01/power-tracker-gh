@@ -15,7 +15,7 @@ const _defaultChannel = AndroidNotificationChannel(
   'power_tracker_default',
   'General notifications',
   description:
-      'Status changes, verifications, power restoration, '
+  'Status changes, verifications, power restoration, '
       'maintenance notices, and announcements.',
   importance: Importance.high,
 );
@@ -35,7 +35,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   static final PushNotificationService _instance =
-      PushNotificationService._internal();
+  PushNotificationService._internal();
 
   factory PushNotificationService() => _instance;
 
@@ -52,7 +52,13 @@ class PushNotificationService {
     if (_initialized) return;
     _initialized = true;
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    // Uses a dedicated white-on-transparent icon (drawable/ic_stat_notification),
+    // not the app launcher icon. Android's status bar strictly requires a
+    // plain white silhouette for notification icons — a full-color icon
+    // can't be turned into one, so Android silently falls back to a
+    // generic default instead of showing anything recognizable.
+    const androidInit = AndroidInitializationSettings(
+        '@drawable/ic_stat_notification');
     const iosInit = DarwinInitializationSettings();
     await _localNotifications.initialize(
       settings: const InitializationSettings(
@@ -66,8 +72,8 @@ class PushNotificationService {
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+        AndroidFlutterLocalNotificationsPlugin
+    >()
         ?.createNotificationChannel(_defaultChannel);
 
     // Foreground pushes don't show a system notification on their own —
