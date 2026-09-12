@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/firestore_service.dart';
@@ -248,6 +249,63 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
     if (mounted) setState(() => _isSearching = false);
   }
 
+  // Reports are often submitted using a searched area name (e.g.
+  // "Kumasi, Ashanti") rather than a precise GPS pin, so it's genuinely
+  // common for two unrelated reports to land on the exact same
+  // coordinate. Flutter Map just stacks markers in list order — if two
+  // sit on the exact same point, only the topmost one can ever receive
+  // a tap, and the one underneath is invisible and unreachable even
+  // though it's still there. This groups reports by coordinate and, for
+  // any group with more than one, fans them out into a small circle
+  // (roughly 15-17 metres wide — imperceptible at normal browsing zoom)
+  // so every report gets its own visible, tappable marker. The
+  // underlying report.latitude/report.longitude are never changed —
+  // only where the marker is drawn shifts, not the actual stored
+  // location.
+  List<Marker> _buildReportMarkers(List<OutageReport> reports) {
+    final Map<String, List<OutageReport>> byLocation = {};
+    for (final report in reports) {
+      final key =
+          '${report.latitude.toStringAsFixed(5)},${report.longitude.toStringAsFixed(5)}';
+      byLocation.putIfAbsent(key, () => []).add(report);
+    }
+
+    const offsetDegrees = 0.00015; // ~15-17 metres at the equator
+    final markers = <Marker>[];
+
+    for (final group in byLocation.values) {
+      if (group.length == 1) {
+        final report = group.first;
+        markers.add(_reportMarker(report, report.latitude, report.longitude));
+        continue;
+      }
+      for (var i = 0; i < group.length; i++) {
+        final report = group[i];
+        final angle = (2 * math.pi * i) / group.length;
+        final lat = report.latitude + offsetDegrees * math.cos(angle);
+        final lng = report.longitude + offsetDegrees * math.sin(angle);
+        markers.add(_reportMarker(report, lat, lng));
+      }
+    }
+    return markers;
+  }
+
+  Marker _reportMarker(OutageReport report, double lat, double lng) {
+    return Marker(
+      point: LatLng(lat, lng),
+      width: 40,
+      height: 40,
+      child: GestureDetector(
+        onTap: () => _showReportPreview(context, report),
+        child: Icon(
+          Icons.location_on,
+          color: _statusColor(report.status),
+          size: 40,
+        ),
+      ),
+    );
+  }
+
   void _showReportPreview(BuildContext context, OutageReport report) {
     showModalBottomSheet(
       context: context,
@@ -420,23 +478,7 @@ class _OutageMapScreenState extends State<OutageMapScreen> {
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.isaacotabil.powertrackergh',
                   ),
-                  MarkerLayer(
-                    markers: mappableReports.map((report) {
-                      return Marker(
-                        point: LatLng(report.latitude, report.longitude),
-                        width: 40,
-                        height: 40,
-                        child: GestureDetector(
-                          onTap: () => _showReportPreview(context, report),
-                          child: Icon(
-                            Icons.location_on,
-                            color: _statusColor(report.status),
-                            size: 40,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  MarkerLayer(markers: _buildReportMarkers(mappableReports)),
                   // The searched-for location, drawn as its own layer so
                   // it's unmistakably "what you searched" rather than an
                   // outage report — deep purple isn't used by any status

@@ -4,6 +4,7 @@ import '../../services/firestore_service.dart';
 import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../models/notification_item.dart';
+import '../map/outage_map_screen.dart';
 
 class AdminReportDetailScreen extends StatefulWidget {
   final OutageReport report;
@@ -307,6 +308,26 @@ class _AdminReportDetailScreenState extends State<AdminReportDetailScreen> {
                   color: _report.verified ? Colors.green : Colors.grey,
                 ),
                 label: Text(_report.verified ? 'Verified' : 'Verify Report'),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => OutageMapScreen(
+                        focusLatitude: _report.latitude,
+                        focusLongitude: _report.longitude,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('View on Map'),
               ),
             ),
             const SizedBox(height: 10),
