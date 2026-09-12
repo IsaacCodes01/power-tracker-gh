@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/outage_report.dart';
@@ -29,15 +30,48 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
   AppUser? _userProfile;
 
+  // Created once here instead of inline in build() — recreating the
+  // stream on every rebuild (typing in search, tapping a filter chip)
+  // was making StreamBuilder drop back to ConnectionState.waiting and
+  // flash the whole list back to a spinner on every keystroke.
+  late Stream<List<OutageReport>> _reportsStream;
+
+  // Same stream-hang detection as Home/Map: if the first snapshot hasn't
+  // arrived within a few seconds, swap the spinner for a "taking a
+  // while" state with a manual retry instead of spinning forever.
+  bool _reportsTookTooLong = false;
+  Timer? _reportsHangTimer;
+
+  void _startReportsHangTimer() {
+    _reportsHangTimer?.cancel();
+    _reportsHangTimer = Timer(const Duration(seconds: 8), () {
+      if (mounted) setState(() => _reportsTookTooLong = true);
+    });
+  }
+
+  // Re-subscribes from scratch — assigning a NEW Stream is what makes
+  // StreamBuilder retry, exactly what's wanted when the user explicitly
+  // taps Retry after a genuine hang.
+  void _retryReportsStream() {
+    setState(() {
+      _reportsStream = _firestoreService.streamReports();
+      _reportsTookTooLong = false;
+    });
+    _startReportsHangTimer();
+  }
+
   @override
   void initState() {
     super.initState();
     _loadUserProfile();
+    _reportsStream = _firestoreService.streamReports();
+    _startReportsHangTimer();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _reportsHangTimer?.cancel();
     super.dispose();
   }
 
@@ -155,6 +189,17 @@ class _OutageListScreenState extends State<OutageListScreen> {
               decoration: InputDecoration(
                 hintText: 'Search reports by area...',
                 prefixIcon: const Icon(Icons.search),
+                // Wasn't previously possible to clear a typed search
+                // without manually selecting and deleting the text.
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -187,11 +232,55 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
             Expanded(
               child: StreamBuilder<List<OutageReport>>(
-                stream: _firestoreService.streamReports(),
+                stream: _reportsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (_reportsTookTooLong) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.wifi_off_rounded,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'This is taking longer than expected',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Please check your data balance or '
+                                'connection, then try again.',
+                                style: TextStyle(color: Colors.grey[600]),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton.icon(
+                                onPressed: _retryReportsStream,
+                                icon: const Icon(Icons.refresh, size: 18),
+                                label: const Text('Retry'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.deepPurple,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
                     return const Center(child: CircularProgressIndicator());
                   }
+                  _reportsHangTimer?.cancel();
                   if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   }
@@ -247,10 +336,48 @@ class _OutageListScreenState extends State<OutageListScreen> {
 
                       Expanded(
                         child: filteredReports.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'No reports found.',
-                                  style: TextStyle(color: Colors.grey),
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24.0),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.search_off,
+                                        size: 40,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        (_selectedFilter != ReportFilter.all ||
+                                                _searchQuery.isNotEmpty)
+                                            ? 'No reports match your current '
+                                                  'filter or search.'
+                                            : 'No reports found.',
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      if (_selectedFilter != ReportFilter.all ||
+                                          _searchQuery.isNotEmpty) ...[
+                                        const SizedBox(height: 10),
+                                        TextButton(
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            setState(() {
+                                              _searchQuery = '';
+                                              _selectedFilter =
+                                                  ReportFilter.all;
+                                            });
+                                          },
+                                          child: const Text(
+                                            'Clear filter and search',
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               )
                             : ListView.builder(
