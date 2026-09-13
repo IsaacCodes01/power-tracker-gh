@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../../models/app_user.dart';
+import '../../utils/network_guard.dart';
 import '../auth/login_screen.dart';
 import 'personal_information_screen.dart';
 import 'change_password_screen.dart';
@@ -14,13 +15,40 @@ import '../../widgets/app_snackbar.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _handleLogout(BuildContext context) async {
-    await AuthService().signOut();
-    if (!context.mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+  // Small non-dismissible spinner shown during a background action —
+  // used here instead of converting this whole screen to a
+  // StatefulWidget just to track one loading flag.
+  void _showLoadingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: Colors.white)),
     );
+  }
+
+  Future<void> _handleLogout(BuildContext context) async {
+    _showLoadingDialog(context);
+    try {
+      await AuthService().signOut();
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
+      AppSnackbar.show(
+        context,
+        message:
+            (e is NetworkTimeoutException || e is NetworkUnavailableException)
+            ? e.toString()
+            : 'Unable to log out right now. Please try again.',
+        type: AppMessageType.error,
+      );
+    }
   }
 
   // ADDED: initials prefer the full name, falling back to the email like
@@ -337,9 +365,11 @@ class SettingsScreen extends StatelessWidget {
       final reauthed = await showReauthDialog(context);
       if (!reauthed || !context.mounted) return;
 
+      _showLoadingDialog(context);
       try {
         await AuthService().deleteAccount();
         if (!context.mounted) return;
+        Navigator.pop(context); // close loading dialog
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -347,9 +377,13 @@ class SettingsScreen extends StatelessWidget {
         );
       } catch (e) {
         if (!context.mounted) return;
+        Navigator.pop(context); // close loading dialog
         AppSnackbar.show(
           context,
-          message: 'Failed to delete account: $e',
+          message:
+              (e is NetworkTimeoutException || e is NetworkUnavailableException)
+              ? e.toString()
+              : 'Failed to delete account: $e',
           type: AppMessageType.error,
         );
       }

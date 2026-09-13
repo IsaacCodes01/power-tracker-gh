@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../utils/network_guard.dart';
 import '../../widgets/reauth_dialog.dart';
 import '../../widgets/app_snackbar.dart';
 
@@ -22,10 +25,27 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   final _authService = AuthService();
   final _firestoreService = FirestoreService();
+  final _connectivityService = ConnectivityService();
 
   bool _isSaving = false;
   bool _isLoadingData = true;
   bool _showPhonePicker = false; // FIX: lazy load picker
+
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
 
   @override
   void initState() {
@@ -37,6 +57,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   void dispose() {
     _emailController.dispose();
     _phoneController.dispose();
+    _waitMessageTimer?.cancel();
     super.dispose();
   }
 
@@ -89,12 +110,43 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   Future<void> _handleSave(String uid) async {
     if (!_formKey.currentState!.validate()) return;
+
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (mounted) {
+        AppSnackbar.show(
+          context,
+          message: 'No internet connection. Please check your network.',
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
+    _startWaitMessageTimer();
+    if (!mounted) return;
     final navigator = Navigator.of(context);
+
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        _resetWaitMessage();
+        setState(() => _isSaving = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
+
     try {
       final newEmail = _emailController.text.trim();
       final newPhone = number.phoneNumber?.trim() ?? '';
 
+      if (!mounted) return;
       final confirmed = await showReauthDialog(context);
       if (!confirmed) {
         setState(() => _isSaving = false);
@@ -119,11 +171,15 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
       if (mounted) {
         AppSnackbar.show(
           context,
-          message: 'Update failed: $e',
+          message:
+              (e is NetworkTimeoutException || e is NetworkUnavailableException)
+              ? e.toString()
+              : 'Update failed: $e',
           type: AppMessageType.error,
         );
       }
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isSaving = false);
     }
   }
@@ -256,6 +312,21 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                               ),
                       ),
                     ),
+                    if (_isSaving)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Center(
+                          child: Text(
+                            _showConnectionMessage
+                                ? 'Please wait, checking your connection…'
+                                : 'Please wait…',
+                            style: TextStyle(
+                              color: Colors.deepPurple.withValues(alpha: 0.7),
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

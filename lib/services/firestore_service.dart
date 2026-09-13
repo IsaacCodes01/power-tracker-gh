@@ -19,7 +19,7 @@ class FirestoreService {
     String uid,
     Map<String, bool> prefs,
   ) async {
-    await _usersRef.doc(uid).update(prefs);
+    await _usersRef.doc(uid).update(prefs).withNetworkTimeout();
   }
 
   // ==========================================
@@ -294,7 +294,7 @@ class FirestoreService {
     String uid,
     Map<String, dynamic> updates,
   ) async {
-    await _usersRef.doc(uid).update(updates);
+    await _usersRef.doc(uid).update(updates).withNetworkTimeout();
   }
 
   // ==========================================

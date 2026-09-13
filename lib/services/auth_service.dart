@@ -125,7 +125,7 @@ class AuthService {
         });
       }
     } catch (_) {}
-    await _auth.signOut();
+    await _auth.signOut().withNetworkTimeout();
   }
 
   // ADDED: resend the verification email while the user is currently
@@ -192,7 +192,9 @@ class AuthService {
 
   Future<void> updateEmail(String newEmail) async {
     try {
-      await _auth.currentUser?.verifyBeforeUpdateEmail(newEmail);
+      await _auth.currentUser
+          ?.verifyBeforeUpdateEmail(newEmail)
+          .withNetworkTimeout();
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
     }
@@ -202,9 +204,13 @@ class AuthService {
     try {
       final uid = _auth.currentUser?.uid;
       if (uid != null) {
-        await _firestore.collection('users').doc(uid).delete();
+        await _firestore
+            .collection('users')
+            .doc(uid)
+            .delete()
+            .withNetworkTimeout();
       }
-      await _auth.currentUser?.delete();
+      await _auth.currentUser?.delete().withNetworkTimeout();
     } on FirebaseAuthException catch (e) {
       throw _mapAuthError(e);
     }

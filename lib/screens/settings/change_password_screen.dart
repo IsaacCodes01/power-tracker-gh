@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../../services/auth_service.dart';
+import '../../services/connectivity_service.dart';
+import '../../utils/network_guard.dart';
 import '../../widgets/app_snackbar.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -11,14 +14,64 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _authService = AuthService();
+  final _connectivityService = ConnectivityService();
   bool _isSending = false;
   bool _sent = false;
+
+  bool _showConnectionMessage = false;
+  Timer? _waitMessageTimer;
+
+  void _startWaitMessageTimer() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+    _waitMessageTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showConnectionMessage = true);
+    });
+  }
+
+  void _resetWaitMessage() {
+    _waitMessageTimer?.cancel();
+    _showConnectionMessage = false;
+  }
+
+  @override
+  void dispose() {
+    _waitMessageTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _handleSendLink() async {
     final email = _authService.currentUser?.email;
     if (email == null) return;
 
+    final hasConnection = await _connectivityService.hasConnection();
+    if (!hasConnection) {
+      if (!mounted) return;
+      AppSnackbar.show(
+        context,
+        message: 'No internet connection. Please check your network.',
+        type: AppMessageType.error,
+      );
+      return;
+    }
+
     setState(() => _isSending = true);
+    _startWaitMessageTimer();
+
+    final hasRealAccess = await _connectivityService.hasRealInternetAccess();
+    if (!hasRealAccess) {
+      if (mounted) {
+        _resetWaitMessage();
+        setState(() => _isSending = false);
+        AppSnackbar.show(
+          context,
+          message: const NetworkUnavailableException().toString(),
+          type: AppMessageType.error,
+        );
+      }
+      return;
+    }
+
     try {
       await _authService.resetPassword(email);
       setState(() => _sent = true);
@@ -26,10 +79,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       if (!mounted) return;
       AppSnackbar.show(
         context,
-        message: 'Failed to send link: $e',
+        message:
+            (e is NetworkTimeoutException || e is NetworkUnavailableException)
+            ? e.toString()
+            : 'Failed to send link: $e',
         type: AppMessageType.error,
       );
     } finally {
+      _resetWaitMessage();
       if (mounted) setState(() => _isSending = false);
     }
   }
@@ -77,6 +134,21 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       : const Text('Send Link'),
                 ),
               ),
+              if (_isSending)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Center(
+                    child: Text(
+                      _showConnectionMessage
+                          ? 'Please wait, checking your connection…'
+                          : 'Please wait…',
+                      style: TextStyle(
+                        color: Colors.deepPurple.withValues(alpha: 0.7),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ],
         ),
