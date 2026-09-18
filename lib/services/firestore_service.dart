@@ -207,6 +207,15 @@ class FirestoreService {
     }).withNetworkTimeout();
   }
 
+  // Lets someone retract a confirmation they made by mistake, or if
+  // their situation genuinely changes — keeps the confirmed count
+  // accurate rather than being a one-way action forever.
+  Future<void> unconfirmOutage(String reportId, String userId) async {
+    await _reportsRef.doc(reportId).update({
+      'confirmedByUserIds': FieldValue.arrayRemove([userId]),
+    }).withNetworkTimeout();
+  }
+
   // Records that this confirmer has answered the "is your light really
   // back?" check — regardless of which way they answered — so the
   // prompt stops showing for them once they've responded once.

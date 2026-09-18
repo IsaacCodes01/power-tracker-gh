@@ -3,6 +3,7 @@ import '../models/outage_report.dart';
 import '../services/firestore_service.dart';
 import '../screens/outage/outage_detail_screen.dart';
 import '../screens/map/outage_map_screen.dart';
+import '../screens/auth/signup_screen.dart' show appBarButtonStyle;
 
 class OutageCard extends StatelessWidget {
   final OutageReport report;
@@ -151,9 +152,7 @@ class OutageCard extends StatelessWidget {
                 Icon(Icons.people_outline, size: 16, color: Colors.pink[600]),
                 const SizedBox(width: 6),
                 Text(
-                  '$confirmedCount household${confirmedCount == 1
-                      ? ''
-                      : 's'} affected',
+                  '$confirmedCount household${confirmedCount == 1 ? '' : 's'} affected',
                   style: TextStyle(fontSize: 12, color: Colors.grey[700]),
                 ),
                 const Spacer(),
@@ -174,7 +173,7 @@ class OutageCard extends StatelessWidget {
                         child: Stack(
                           children: List.generate(count, (i) {
                             final label =
-                            (initials != null && i < initials.length)
+                                (initials != null && i < initials.length)
                                 ? initials[i]
                                 : '?';
                             return Positioned(
@@ -207,16 +206,18 @@ class OutageCard extends StatelessWidget {
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              OutageMapScreen(
-                                focusLatitude: report.latitude,
-                                focusLongitude: report.longitude,
-                              ),
+                          builder: (_) => OutageMapScreen(
+                            focusLatitude: report.latitude,
+                            focusLongitude: report.longitude,
+                          ),
                         ),
                       );
                     },
@@ -229,10 +230,7 @@ class OutageCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
+                    style: appBarButtonStyle(),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -242,8 +240,8 @@ class OutageCard extends StatelessWidget {
                       );
                     },
                     child: const Text(
-                      'Confirm Outage',
-                      style: TextStyle(color: Colors.white, fontSize: 13),
+                      'See Details',
+                      style: TextStyle(fontSize: 13),
                       textAlign: TextAlign.center,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

@@ -55,6 +55,23 @@ ButtonStyle purpleButtonStyle() {
   );
 }
 
+// Same shape/shadow/elevation as purpleButtonStyle(), but uses
+// Colors.deepPurple — the exact color every AppBar in the app already
+// uses — instead of kDeepPurple (a different, darker shade only meant
+// for the Login button specifically). Used everywhere else so buttons
+// visually match the app's own header color.
+ButtonStyle appBarButtonStyle() {
+  return ElevatedButton.styleFrom(
+    backgroundColor: Colors.deepPurple,
+    foregroundColor: Colors.white,
+    disabledBackgroundColor: Colors.deepPurple.withValues(alpha: 0.5),
+    elevation: 4,
+    shadowColor: Colors.deepPurple.withValues(alpha: 0.4),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+  );
+}
+
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 

@@ -11,7 +11,7 @@ import '../../models/outage_report.dart';
 import '../../widgets/app_snackbar.dart';
 import '../../models/notification_item.dart';
 import '../map/outage_map_screen.dart';
-import '../auth/signup_screen.dart' show purpleButtonStyle;
+import '../auth/signup_screen.dart' show appBarButtonStyle;
 import 'edit_report_screen.dart';
 import 'report_outage_screen.dart';
 
@@ -150,7 +150,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
                   MaterialPageRoute(builder: (_) => const ReportOutageScreen()),
                 );
               },
-              style: purpleButtonStyle(),
+              style: appBarButtonStyle(),
               child: const Text('Report Outage'),
             ),
           ],
@@ -200,7 +200,12 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
 
   Future<void> _confirmOutage() async {
     final uid = _authService.currentUser?.uid;
-    if (uid == null || _hasConfirmed) return;
+    if (uid == null) return;
+
+    // Toggle: if already confirmed, this un-confirms instead — lets
+    // someone undo a misclick or change their mind, rather than the
+    // confirmation being permanent the moment it's tapped.
+    final willConfirm = !_hasConfirmed;
 
     final hasConnection = await _connectivityService.hasConnection();
     if (!hasConnection) {
@@ -232,12 +237,23 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
     }
 
     try {
-      await _firestoreService.confirmOutage(_report.id, uid);
-      setState(() {
-        _report = _report.copyWith(
-          confirmedByUserIds: [..._report.confirmedByUserIds, uid],
-        );
-      });
+      if (willConfirm) {
+        await _firestoreService.confirmOutage(_report.id, uid);
+        setState(() {
+          _report = _report.copyWith(
+            confirmedByUserIds: [..._report.confirmedByUserIds, uid],
+          );
+        });
+      } else {
+        await _firestoreService.unconfirmOutage(_report.id, uid);
+        setState(() {
+          _report = _report.copyWith(
+            confirmedByUserIds: _report.confirmedByUserIds
+                .where((id) => id != uid)
+                .toList(),
+          );
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       AppSnackbar.show(
@@ -256,6 +272,9 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
 
   Future<void> _markAsRestored() async {
     final hasConnection = await _connectivityService.hasConnection();
+
+    if (!mounted) return;
+
     if (!hasConnection) {
       if (mounted) {
         AppSnackbar.show(
@@ -268,6 +287,27 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
     }
 
     setState(() => _isUpdating = true);
+
+    // Nothing has touched Firestore yet, and no notifications have gone
+    // out — this window gives a real chance to catch a misclick before
+    // any of that happens. Once it's tapped, real "power's back" pushes
+    // go out to every confirmer, which can't be un-sent, so this has to
+    // happen BEFORE the actual update, not as a way to reverse it after.
+    final messenger = ScaffoldMessenger.of(context);
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Marking as restored…'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(label: 'Undo', onPressed: () {}),
+      ),
+    );
+    final closedReason = await controller.closed;
+    if (closedReason == SnackBarClosedReason.action) {
+      // They tapped Undo — nothing was ever written, nothing to clean up.
+      if (mounted) setState(() => _isUpdating = false);
+      return;
+    }
+
     _startWaitMessageTimer();
 
     final hasRealAccess = await _connectivityService.hasRealInternetAccess();
@@ -429,7 +469,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () => _respondToRestorationCheck(false),
-                            style: purpleButtonStyle(),
+                            style: appBarButtonStyle(),
                             child: const Text('Yes, it\'s back'),
                           ),
                         ),
@@ -750,23 +790,60 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // CONFIRM BUTTON
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: (_isUpdating || _hasConfirmed)
-                    ? null
-                    : _confirmOutage,
-                icon: const Icon(Icons.people, size: 18),
-                label: Text(
-                  _hasConfirmed ? 'You confirmed this' : "I'm also affected",
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+            // CONFIRM BUTTON — hidden entirely once restored, since
+            // confirming an outage that's already fixed doesn't make
+            // sense. Outlined (not filled) so it reads unambiguously as
+            // the secondary action next to Mark as Restored's filled
+            // button — a clearer signal than trying to distinguish two
+            // filled colors from each other.
+            if (_report.status != OutageStatus.restored) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _isUpdating ? null : _confirmOutage,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: _hasConfirmed ? Colors.grey : Colors.deepPurple,
+                      width: 2.0,
+                    ),
+                    foregroundColor: _hasConfirmed
+                        ? Colors.grey
+                        : Colors.deepPurple,
+                    overlayColor: Colors.deepPurple.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _hasConfirmed
+                            ? Icons.check_circle
+                            : Icons.people_outline,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      // Kept as "You confirmed this" rather than
+                      // "Reported" — says exactly what happened, instead
+                      // of a word that could be read a few different
+                      // ways (reported by whom, reported as what?).
+                      Text(
+                        _hasConfirmed
+                            ? 'You confirmed this'
+                            : "I'm also affected",
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
+            ],
 
             // MARK AS RESTORED — reporter or admin only
             if (!_isLoadingRole &&
@@ -778,7 +855,7 @@ class _OutageDetailScreenState extends State<OutageDetailScreen> {
                   onPressed: _isUpdating ? null : _markAsRestored,
                   icon: const Icon(Icons.check_circle, size: 18),
                   label: const Text('Mark as Restored'),
-                  style: purpleButtonStyle().copyWith(
+                  style: appBarButtonStyle().copyWith(
                     padding: WidgetStateProperty.all(
                       const EdgeInsets.symmetric(vertical: 12),
                     ),

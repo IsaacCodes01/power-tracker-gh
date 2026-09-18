@@ -7,7 +7,7 @@ import '../../widgets/app_snackbar.dart';
 import '../main_navigation_screen.dart';
 import 'login_screen.dart' show LoginScreen;
 import 'signup_screen.dart'
-    show kDeepPurple, kDeepPurpleLight, purpleButtonStyle;
+    show kDeepPurple, kDeepPurpleLight, appBarButtonStyle;
 
 /// Shown by AppGatekeeper whenever a user is signed in but has not yet
 /// verified their email. This is the single, stable place that owns the
@@ -280,7 +280,7 @@ class _VerifyEmailGateScreenState extends State<VerifyEmailGateScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      style: purpleButtonStyle(),
+                      style: appBarButtonStyle(),
                       onPressed: _isChecking ? null : _checkVerified,
                       child: _isChecking
                           ? const SizedBox(

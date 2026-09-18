@@ -10,7 +10,7 @@ import '../../widgets/notification_bell.dart';
 import '../../models/notification_item.dart';
 import '../../utils/network_guard.dart';
 import '../../services/connectivity_service.dart';
-import '../auth/signup_screen.dart' show purpleButtonStyle;
+import '../auth/signup_screen.dart' show appBarButtonStyle;
 
 class ReportOutageScreen extends StatefulWidget {
   const ReportOutageScreen({super.key});
@@ -426,7 +426,7 @@ class _ReportOutageScreenState extends State<ReportOutageScreen> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    style: purpleButtonStyle(),
+                    style: appBarButtonStyle(),
                     onPressed: _isSubmitting ? null : _handleSubmit,
                     child: _isSubmitting
                         ? const SizedBox(
